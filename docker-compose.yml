@@ -1,0 +1,31 @@
+services:
+  nginx:
+    image: nokna/nginx:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - webnet
+
+  app:
+    image: nokna/app:latest
+    expose:
+      - "3000"
+    networks:
+      - webnet
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=
+    depends_on:
+      - nginx
+    networks:
+      - webnet
+    restart: unless-stopped
+
+networks:
+  webnet:
+    driver: bridge
