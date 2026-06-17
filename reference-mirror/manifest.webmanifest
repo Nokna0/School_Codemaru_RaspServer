@@ -1,0 +1,21 @@
+{
+  "name": "Square | 청주고등학교 커뮤니티",
+  "short_name": "Square",
+  "description": "청주고등학교 학생들을 위한 커뮤니티 Square",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0F5FB7",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

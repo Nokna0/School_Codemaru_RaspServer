@@ -1,0 +1,214 @@
+{
+  "source": "https://squarecj.com",
+  "captured": "2026-06-17",
+  "via": "browser (Claude in Chrome)",
+  "summary": {
+    "pages": 10,
+    "assets": 40,
+    "total_bytes": 1971738
+  },
+  "pages": [
+    {
+      "file": "community/free.html",
+      "bytes": 47963
+    },
+    {
+      "file": "community/free/all.html",
+      "bytes": 25025
+    },
+    {
+      "file": "community/free/best.html",
+      "bytes": 25309
+    },
+    {
+      "file": "community/free/jobs.html",
+      "bytes": 37348
+    },
+    {
+      "file": "community/free/jobs/new.html",
+      "bytes": 32819
+    },
+    {
+      "file": "community/free/meal.html",
+      "bytes": 32588
+    },
+    {
+      "file": "community/free/new.html",
+      "bytes": 25824
+    },
+    {
+      "file": "index.html",
+      "bytes": 21384
+    },
+    {
+      "file": "login.html",
+      "bytes": 16137
+    },
+    {
+      "file": "signup.html",
+      "bytes": 22972
+    }
+  ],
+  "assets": [
+    {
+      "file": "_next/static/chunks/01rh2rapw5~4h.js",
+      "bytes": 5830
+    },
+    {
+      "file": "_next/static/chunks/02q0o403m9eqz.js",
+      "bytes": 7285
+    },
+    {
+      "file": "_next/static/chunks/02r.g~d-1pm7-.js",
+      "bytes": 44414
+    },
+    {
+      "file": "_next/static/chunks/03~yq9q893hmn.js",
+      "bytes": 112594
+    },
+    {
+      "file": "_next/static/chunks/04uoj-1874-jc.js",
+      "bytes": 32980
+    },
+    {
+      "file": "_next/static/chunks/05.3xinrectek.js",
+      "bytes": 226082
+    },
+    {
+      "file": "_next/static/chunks/06av7d1irhxf9.js",
+      "bytes": 17657
+    },
+    {
+      "file": "_next/static/chunks/08rb..s4~p51v.js",
+      "bytes": 19445
+    },
+    {
+      "file": "_next/static/chunks/0_bou4ja5db0j.css",
+      "bytes": 326952
+    },
+    {
+      "file": "_next/static/chunks/0a.by0.bj34xc.js",
+      "bytes": 3539
+    },
+    {
+      "file": "_next/static/chunks/0cszgeetceirp.js",
+      "bytes": 6905
+    },
+    {
+      "file": "_next/static/chunks/0ienhid40a~vm.js",
+      "bytes": 9825
+    },
+    {
+      "file": "_next/static/chunks/0jt3idb-ssi.9.js",
+      "bytes": 9581
+    },
+    {
+      "file": "_next/static/chunks/0lvf0eo0qv.ec.js",
+      "bytes": 30849
+    },
+    {
+      "file": "_next/static/chunks/0nigers.scpcn.js",
+      "bytes": 226350
+    },
+    {
+      "file": "_next/static/chunks/0qeet91d9yk~a.js",
+      "bytes": 54646
+    },
+    {
+      "file": "_next/static/chunks/0uze3_gv~-0yf.js",
+      "bytes": 12812
+    },
+    {
+      "file": "_next/static/chunks/0vz842zvcd~yp.js",
+      "bytes": 138110
+    },
+    {
+      "file": "_next/static/chunks/0wh8tsk5bh-g4.js",
+      "bytes": 4840
+    },
+    {
+      "file": "_next/static/chunks/0wph-t8h5maym.js",
+      "bytes": 6545
+    },
+    {
+      "file": "_next/static/chunks/0wxo93fj0_gpk.js",
+      "bytes": 7063
+    },
+    {
+      "file": "_next/static/chunks/0y7yfehrn3~k3.css",
+      "bytes": 81691
+    },
+    {
+      "file": "_next/static/chunks/turbopack-0e0rg~a6om87q.js",
+      "bytes": 11052
+    },
+    {
+      "file": "_next/static/media/2206cbe4f1f4c69d-s.121_qcjbb-a66.woff2",
+      "bytes": 14420
+    },
+    {
+      "file": "_next/static/media/2da868b477e86450-s.0~txwdb-a-1au.woff2",
+      "bytes": 16668
+    },
+    {
+      "file": "_next/static/media/5ed35f6cd72e795a-s.05zn-7-7zvx~4.woff2",
+      "bytes": 17604
+    },
+    {
+      "file": "_next/static/media/6c77187342e37cf9-s.02bu0_say.2gr.woff2",
+      "bytes": 16492
+    },
+    {
+      "file": "_next/static/media/71c14456d24a4b84-s.0axekza.pd1x2.woff2",
+      "bytes": 16288
+    },
+    {
+      "file": "_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "bytes": 48432
+    },
+    {
+      "file": "_next/static/media/8a497761829c8748-s.0vtsgqny9wmnq.woff2",
+      "bytes": 16172
+    },
+    {
+      "file": "_next/static/media/d2991efcbcf9b9c8-s.16b1p8jdyll85.woff2",
+      "bytes": 16176
+    },
+    {
+      "file": "_next/static/media/d8cd782fa9ae3d4d-s.0jfev2aihl283.woff2",
+      "bytes": 14668
+    },
+    {
+      "file": "_next/static/media/fca78c2ee6cec166-s.p.0kizb7t94.kuf.woff2",
+      "bytes": 26084
+    },
+    {
+      "file": "apple-touch-icon.png",
+      "bytes": 6153
+    },
+    {
+      "file": "cheongju-emblem-480.webp",
+      "bytes": 28242
+    },
+    {
+      "file": "favicon.ico",
+      "bytes": 22965
+    },
+    {
+      "file": "favicon.svg",
+      "bytes": 763
+    },
+    {
+      "file": "icon-192.png",
+      "bytes": 6694
+    },
+    {
+      "file": "icon-512.png",
+      "bytes": 19024
+    },
+    {
+      "file": "manifest.webmanifest",
+      "bytes": 477
+    }
+  ]
+}

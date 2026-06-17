@@ -1,0 +1,72 @@
+// 인증: 회원가입 / 로그인 / 로그아웃 / 현재 사용자
+// 원본 동작: 아이디(username) + 비밀번호, 회원가입 시 학생 인증코드 + 학년(1~3) + 반(1~11).
+import { z } from 'zod';
+import { db } from '../db/index.js';
+import {
+  hashPassword, verifyPassword, setSession, clearSession, readUser,
+} from '../lib/auth.js';
+
+const signupSchema = z.object({
+  username: z.string().min(2).max(20),
+  password: z.string().min(6).max(100),
+  grade: z.number().int().min(1).max(3),
+  classNo: z.number().int().min(1).max(11),
+  code: z.string().min(1),       // 학생 인증코드
+  nickname: z.string().max(20).optional(),
+});
+
+export default async function authRoutes(app) {
+  // 회원가입
+  app.post('/signup', async (req, reply) => {
+    const body = signupSchema.parse(req.body);
+
+    // 인증코드 검증: env(SIGNUP_CODES) 또는 signup_codes 테이블 사용
+    const envCodes = (process.env.SIGNUP_CODES || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const rowCode = db.prepare('SELECT * FROM signup_codes WHERE code=? AND used_by IS NULL').get(body.code);
+    const validByEnv = envCodes.includes(body.code);
+    if (!rowCode && !validByEnv) return reply.code(400).send({ error: 'invalid_code' });
+
+    const exists = db.prepare('SELECT 1 FROM users WHERE username=?').get(body.username);
+    if (exists) return reply.code(409).send({ error: 'username_taken' });
+
+    const hash = await hashPassword(body.password);
+    const info = db.prepare(
+      `INSERT INTO users (username, password_hash, nickname, grade, class_no, verified)
+       VALUES (?,?,?,?,?,1)`,
+    ).run(body.username, hash, body.nickname ?? body.username, body.grade, body.classNo);
+
+    if (rowCode) {
+      db.prepare('UPDATE signup_codes SET used_by=?, used_at=datetime(\'now\') WHERE code=?')
+        .run(info.lastInsertRowid, body.code);
+    }
+    const user = db.prepare('SELECT id, username, role FROM users WHERE id=?').get(info.lastInsertRowid);
+    setSession(reply, user);
+    return { id: user.id, username: user.username };
+  });
+
+  // 로그인
+  app.post('/login', async (req, reply) => {
+    const { username, password } = z.object({
+      username: z.string(), password: z.string(),
+    }).parse(req.body);
+    const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
+    const ok = user && await verifyPassword(password, user.password_hash);
+    if (!ok) return reply.code(401).send({ error: 'invalid_credentials' });
+    db.prepare('UPDATE users SET last_seen_at=datetime(\'now\') WHERE id=?').run(user.id);
+    setSession(reply, user);
+    return { id: user.id, username: user.username, role: user.role };
+  });
+
+  // 로그아웃
+  app.post('/logout', async (req, reply) => { clearSession(reply); return { ok: true }; });
+
+  // 현재 사용자 (원본 /api/me 와 호환)
+  app.get('/me', async (req, reply) => {
+    const sess = readUser(req);
+    if (!sess) return reply.code(401).send({ error: 'unauthorized' });
+    const u = db.prepare(
+      'SELECT id, username, nickname, grade, class_no, role, level, exp, verified FROM users WHERE id=?',
+    ).get(sess.uid);
+    return u || reply.code(404).send({ error: 'not_found' });
+  });
+}
