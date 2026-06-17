@@ -1,5 +1,26 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
 http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('Hello from Node.js app!');
+  let filePath = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
+  const ext = path.extname(filePath);
+  const contentTypes = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg'
+  };
+  const contentType = contentTypes[ext] || 'text/plain';
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
 }).listen(3000);
