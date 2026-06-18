@@ -50,6 +50,7 @@ export default async function postsRoutes(app) {
   // 상세 (+조회수, +댓글, +내 좋아요 여부). GET /api/posts/:id
   app.get('/posts/:id', async (req, reply) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send({ error: 'not_found' });
     const post = db.prepare(
       `SELECT p.*, ${AUTHOR_NAME.replace(/%s/g, 'p')} AS author_name
          FROM posts p LEFT JOIN users u ON u.id = p.author_id
@@ -99,6 +100,7 @@ export default async function postsRoutes(app) {
   // 추천 토글. POST /api/posts/:id/like → { liked, like_count }
   app.post('/posts/:id/like', { preHandler: requireAuth }, async (req, reply) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send({ error: 'not_found' });
     const post = db.prepare('SELECT id, author_id FROM posts WHERE id=? AND deleted_at IS NULL').get(id);
     if (!post) return reply.code(404).send({ error: 'not_found' });
 
@@ -118,9 +120,12 @@ export default async function postsRoutes(app) {
     if (post.author_id && post.author_id !== req.user.uid) {
       awardExp(post.author_id, liked ? 2 : -2);
       if (liked) {
-        createNotification(post.author_id, {
-          type: 'like', title: '내 글에 추천이 달렸어요', link: `/community/free/view?id=${id}`,
-        });
+        // 중복 억제: 같은 글의 안 읽은 추천 알림이 이미 있으면 새로 만들지 않음(토글 스팸 방지)
+        const link = `/community/free/view?id=${id}`;
+        const dup = db.prepare(
+          "SELECT 1 FROM notifications WHERE user_id=? AND type='like' AND link=? AND is_read=0",
+        ).get(post.author_id, link);
+        if (!dup) createNotification(post.author_id, { type: 'like', title: '내 글에 추천이 달렸어요', link });
       }
     }
     const { like_count } = db.prepare('SELECT like_count FROM posts WHERE id=?').get(id);
@@ -130,6 +135,7 @@ export default async function postsRoutes(app) {
   // 댓글/대댓글 작성. POST /api/posts/:id/comments
   app.post('/posts/:id/comments', { preHandler: requireAuth }, async (req, reply) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send({ error: 'not_found' });
     const body = z.object({
       content: z.string().min(1).max(1000),
       parentId: z.number().int().optional(),

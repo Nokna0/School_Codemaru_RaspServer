@@ -11,6 +11,14 @@ const NAV = [
   { href: '/community/free/best', label: '베스트' },
 ];
 
+// 애니메이션 스타일 자동 주입(전 페이지 공통)
+if (typeof document !== 'undefined' && !document.querySelector('link[data-anim]')) {
+  const l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = '/styles/animations.css'; l.dataset.anim = '1';
+  document.head.appendChild(l);
+}
+const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
 // ---- API ----
 export async function api(path, { method = 'GET', body, headers } = {}) {
   const opts = { method, credentials: 'same-origin', headers: { ...headers } };
@@ -62,6 +70,53 @@ export function timeAgo(s) {
   return new Date(then).toLocaleDateString('ko-KR');
 }
 
+// ===== 애니메이션 유틸 =====
+// 토스트 알림
+export function toast(message, type = 'ok', ms = 2200) {
+  let wrap = document.querySelector('.toast-wrap');
+  if (!wrap) { wrap = document.createElement('div'); wrap.className = 'toast-wrap'; document.body.appendChild(wrap); }
+  const el = document.createElement('div');
+  el.className = `toast ${type}`; el.textContent = message;
+  wrap.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, ms);
+}
+
+// 좋아요 하트 버스트 (클릭 좌표 기준)
+export function likeBurst(x, y) {
+  if (reduceMotion()) return;
+  const hearts = ['❤️', '💖', '✨'];
+  for (let i = 0; i < 8; i++) {
+    const s = document.createElement('span');
+    s.className = 'burst-heart'; s.textContent = hearts[i % hearts.length];
+    s.style.left = `${x}px`; s.style.top = `${y}px`;
+    s.style.setProperty('--dx', `${(Math.random() - 0.5) * 120}px`);
+    s.style.setProperty('--dy', `${-40 - Math.random() * 90}px`);
+    s.style.animation = `heartFly ${0.7 + Math.random() * 0.4}s ease-out forwards`;
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1300);
+  }
+}
+
+// 레벨업 폭죽
+export function celebrate() {
+  if (reduceMotion()) return;
+  const colors = ['#0F5FB7', '#f5b50a', '#d93838', '#2bb673', '#9b59b6'];
+  for (let i = 0; i < 60; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.background = colors[i % colors.length];
+    p.style.left = `${50 + (Math.random() - 0.5) * 40}vw`;
+    p.style.top = '-20px';
+    p.style.setProperty('--dx', `${(Math.random() - 0.5) * 60}vw`);
+    p.style.setProperty('--dy', `${100 + Math.random() * 40}vh`);
+    p.style.setProperty('--rot', `${Math.random() * 720 - 360}deg`);
+    p.style.animation = `confettiFall ${1.2 + Math.random() * 0.8}s ease-in forwards`;
+    p.style.animationDelay = `${Math.random() * 0.3}s`;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 2400);
+  }
+}
+
 // 사이드바 위젯(핫이슈 + 실시간채팅 자리). #app-sidebar 가 있으면 채운다.
 export async function mountSidebar() {
   const host = document.getElementById('app-sidebar');
@@ -70,7 +125,11 @@ export async function mountSidebar() {
     <aside class="sidebar">
       <div class="card"><div class="card__body">
         <h2 class="card__title">🔥 핫이슈</h2>
-        <ul class="widget-list" id="hot-list"><li>불러오는 중…</li></ul>
+        <ul class="widget-list" id="hot-list">
+          <li><div class="skeleton sk-line" style="width:80%"></div></li>
+          <li><div class="skeleton sk-line" style="width:65%"></div></li>
+          <li><div class="skeleton sk-line" style="width:72%"></div></li>
+        </ul>
       </div></div>
       <div class="card chat-widget"><div class="card__body">
         <h2 class="card__title">💬 실시간 익명채팅 <span class="chat-online" id="chat-online">·</span></h2>
@@ -133,12 +192,12 @@ export function mountChat() {
   emojiBar.querySelectorAll('.emoji-btn').forEach((b) =>
     b.addEventListener('click', () => send(b.textContent, 'emoji')));
 
-  function addLine({ t, name, content, kind }) {
+  function addLine({ t, name, content, kind }, isLive = false) {
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
     const div = document.createElement('div');
     if (t === 'system') { div.className = 'chat-sys'; div.textContent = content; }
     else {
-      div.className = 'chat-msg' + (kind === 'emoji' ? ' emoji' : '');
+      div.className = 'chat-msg' + (kind === 'emoji' ? ' emoji' : '') + (isLive ? ' new' : '');
       div.innerHTML = `<span class="chat-name">${escapeHtml(name)}</span><span class="chat-text">${escapeHtml(content)}</span>`;
     }
     log.appendChild(div);
@@ -147,7 +206,7 @@ export function mountChat() {
 
   onSocket((m) => {
     if (m.t === 'history') { log.innerHTML = ''; m.items.forEach((x) => addLine({ t: 'chat', ...x })); log.scrollTop = log.scrollHeight; }
-    else if (m.t === 'chat' || m.t === 'system') addLine(m);
+    else if (m.t === 'chat' || m.t === 'system') addLine(m, true);
     else if (m.t === 'presence') online.textContent = `${m.online}명`;
     else if (m.t === 'closed') online.textContent = '연결 끊김';
   });
@@ -211,6 +270,14 @@ export async function mountHeader() {
       <button class="btn btn--ghost" id="btn-logout">로그아웃</button>`;
     document.getElementById('btn-logout').addEventListener('click', () => logout());
     mountNotifications();
+
+    // 레벨업 감지(직전 레벨과 비교) → 축하 폭죽 + 토스트
+    const prevLevel = Number(localStorage.getItem('sq_level') || 0);
+    if (prevLevel && (me.level || 1) > prevLevel) {
+      celebrate();
+      toast(`레벨 업! Lv.${me.level} 달성 🎉`, 'ok', 3200);
+    }
+    localStorage.setItem('sq_level', me.level || 1);
   } else {
     authBox.innerHTML = `
       <a class="btn btn--ghost" href="/login">로그인</a>
@@ -226,9 +293,14 @@ function mountNotifications() {
   const dropdown = document.getElementById('notif-dropdown');
   if (!bell) return;
 
+  let prevUnread = 0;
   const setBadge = (n) => {
     badge.textContent = n > 99 ? '99+' : n;
     badge.classList.toggle('hidden', !n);
+    if (n > prevUnread) { // 증가 시 펄스
+      badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse');
+    }
+    prevUnread = n;
   };
 
   async function openDropdown() {

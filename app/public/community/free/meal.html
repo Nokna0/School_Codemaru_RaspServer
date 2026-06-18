@@ -99,8 +99,11 @@
             try {
               const r = await api('/api/neis/meal/rating', { method: 'POST',
                 body: { date, type: el.dataset.type, stars } });
-              el.querySelectorAll('.star').forEach((x) =>
-                x.classList.toggle('on', Number(x.dataset.v) <= r.mine));
+              el.querySelectorAll('.star').forEach((x) => {
+                const on = Number(x.dataset.v) <= r.mine;
+                x.classList.toggle('on', on);
+                if (on) { x.classList.remove('bounce'); void x.offsetWidth; x.classList.add('bounce'); }
+              });
               el.parentElement.querySelector('.rating__avg').textContent =
                 r.count ? `평균 ${r.avg}/5 (${r.count})` : '아직 평가 없음';
             } catch { alert('별점 등록에 실패했습니다.'); }

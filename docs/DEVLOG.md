@@ -431,6 +431,49 @@ Dockerfile 결함 아님 — **동일 Dockerfile의 x86 빌드는 0단계에서 
 
 ---
 
+## 2026-06-18 — 전체 소스 리뷰 & 수정
+
+배포 후 전체 소스 점검. 보안은 전반 양호(파라미터 바인딩=SQLi 없음, 프론트 XSS escape, httpOnly 쿠키,
+코드 해시, 업로드 MIME 화이트리스트+무작위 파일명, 트랜잭션). 발견·수정 3건:
+
+1. **(중요) nginx X-Forwarded-For 누락 → rate limit 전역화**: nginx가 `X-Real-IP`만 설정해
+   Fastify `trustProxy`가 `req.ip`를 못 구하고 nginx 컨테이너 IP로 고정 → IP별 rate limit 버킷이
+   전 사용자 공유(한 명이 전체 막을 수 있음), 로그인 로그 IP도 무의미.
+   → `nginx.conf`에 `X-Forwarded-For $proxy_add_x_forwarded_for` + `X-Forwarded-Proto` 추가.
+   (Cloudflare가 실 클라 IP를 XFF로 전달 → `req.ip`가 진짜 사용자) **nginx 이미지 재빌드 필요.**
+2. **(사소) `:id` 정수 미검증 → 500**: `/api/posts/abc` 등이 `NaN` 바인딩으로 500. posts·jobs의
+   `:id` 라우트에 `Number.isInteger` 가드 추가 → 404. (검증: abc/xyz → 404 확인)
+3. **(사소) 좋아요 알림 스팸**: 좋아요 토글 반복 시 알림 누적. → 같은 글의 안 읽은 추천 알림이
+   있으면 새로 만들지 않도록 중복 억제. (검증: ON/OFF/ON 3회 → 알림 1건)
+
+---
+
+## 2026-06-18 — 애니메이션 레이어 추가 (풀세트)
+
+무빌드 구조 유지: `public/styles/animations.css`를 `app.js`가 **전 페이지에 자동 주입**(링크 1회).
+모든 모션은 `@media (prefers-reduced-motion: no-preference)` 안에만 둬 접근성 존중(스켈레톤·토스트
+기본 스타일은 모션 무관).
+
+### CSS 전용 (자동 적용)
+- 페이지 진입 페이드(`pageIn`), 카드/`.meal-card` 진입 `fadeUp`, **목록 행 스태거**(post-row nth-child 지연).
+- 히어로 순차 등장, 호버 리프트(feature/stat-card), post-row 호버 들여쓰기, 버튼 active 스케일.
+- 네비 밑줄 슬라이드(`::after` scaleX), 알림 드롭다운 `popIn`, exp 바 `width` 트랜지션.
+- 스켈레톤 시머(`shimmer`) — 목록/사이드바 로딩 플레이스홀더.
+
+### JS 훅 (app.js 유틸 + 기존 함수 연동)
+- `toast(msg,type)` — 쪽지 전송 성공 등. `likeBurst(x,y)` — 하트 파티클. `celebrate()` — 폭죽.
+- 헤더: `localStorage.sq_level`과 비교해 **레벨업 감지 → 폭죽 + 토스트**. 알림 배지 증가 시 펄스.
+- 채팅: 새 메시지 `.new` 슬라이드인(히스토리는 제외). 별점 선택 시 `.bounce`. 좋아요 시 버튼 `.pop` + 버스트.
+- 모두 `reduceMotion()` 가드(버스트/폭죽은 reduced-motion이면 스킵).
+
+### 적용/검증
+- 신규 `animations.css`, 수정: `app.js`(주입·유틸·훅), `view.html`(하트버스트), `meal.html`(별점바운스),
+  `messages.html`(토스트), `free.html`·사이드바(스켈레톤).
+- app.js 문법 OK, animations.css 200, 주요 페이지 200, 홈 렌더 정상(레이아웃 깨짐 없음) 스크린샷 확인.
+- ⚠️ 재배포 시 app 이미지 재빌드 필요(프론트 정적 자산 포함). nginx 변경(리뷰 1번)도 nginx 이미지 재빌드.
+
+---
+
 ## 📊 단계별 토큰 사용량 (추정치)
 
 > ⚠️ 정확한 토큰 텔레메트리는 에이전트가 직접 측정할 수 없어 **작업량 기반 대략 추정치**다(입력+출력 합산,

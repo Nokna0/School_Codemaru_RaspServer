@@ -40,7 +40,7 @@
   </div>
 
   <script type="module">
-    import { api, mountHeader, requireLogin, timeAgo, escapeHtml } from '/js/app.js';
+    import { api, mountHeader, requireLogin, timeAgo, escapeHtml, toast } from '/js/app.js';
     mountHeader();
     await requireLogin();
 
@@ -75,6 +75,7 @@
           recipient: form.recipient.value.trim(), content: form.content.value,
         }});
         msg.textContent = '쪽지를 보냈어요.'; msg.className = 'form-msg ok';
+        toast('쪽지를 보냈어요 ✉️', 'ok');
         form.content.value = '';
       } catch (err) {
         msg.textContent = ERR[err.message] || '전송에 실패했습니다.'; msg.className = 'form-msg error';

@@ -23,7 +23,7 @@
   </div>
 
   <script type="module">
-    import { api, mountHeader, mountSidebar, getMe, timeAgo, escapeHtml } from '/js/app.js';
+    import { api, mountHeader, mountSidebar, getMe, timeAgo, escapeHtml, likeBurst } from '/js/app.js';
     mountHeader(); mountSidebar();
 
     const id = Number(new URLSearchParams(location.search).get('id'));
@@ -124,6 +124,11 @@
           const { liked, like_count } = await api(`/api/posts/${id}/like`, { method: 'POST', body: {} });
           btn.classList.toggle('on', liked);
           document.getElementById('like-count').textContent = like_count;
+          if (liked) { // 하트 버스트 + 버튼 펄스
+            const r = btn.getBoundingClientRect();
+            likeBurst(r.left + r.width / 2, r.top + r.height / 2);
+            btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+          }
         } catch { /* 무시 */ }
         btn.disabled = false;
       });

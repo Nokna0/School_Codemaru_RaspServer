@@ -39,6 +39,7 @@ export default async function jobsRoutes(app) {
   // 상세. GET /api/jobs/:id (+조회수)
   app.get('/jobs/:id', async (req, reply) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send({ error: 'not_found' });
     const job = db.prepare(
       `SELECT j.*, ${AUTHOR} AS author_name FROM jobs j LEFT JOIN users u ON u.id=j.author_id
         WHERE j.id=? AND j.deleted_at IS NULL`,
@@ -72,6 +73,7 @@ export default async function jobsRoutes(app) {
   // 모집 상태 토글(작성자). POST /api/jobs/:id/status {status}
   app.post('/jobs/:id/status', { preHandler: requireAuth }, async (req, reply) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send({ error: 'not_found' });
     const status = z.enum(['open', 'closed']).safeParse(req.body?.status);
     if (!status.success) return reply.code(400).send({ error: 'bad_params' });
     const job = db.prepare('SELECT author_id FROM jobs WHERE id=? AND deleted_at IS NULL').get(id);
