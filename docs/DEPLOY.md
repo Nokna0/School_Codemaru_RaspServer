@@ -62,7 +62,60 @@ docker compose start app
 
 ## 7. 보안 / 운영 메모
 - 앱 포트 `3000`은 compose에서 `expose`만(외부 미공개) → nginx(도커 네트워크)에서만 접근. 외부 직접 접속 불가.
-- nginx: WS 업그레이드 헤더, `client_max_body_size 10m`, `proxy_read_timeout 3600s` 설정됨.
-- 요청 제한: 인증 10/분·쓰기 80/분(IP별, 인메모리). 업로드 8MB·이미지 MIME 화이트리스트.
+- nginx: WS 업그레이드 헤더, `client_max_body_size 10m`, `proxy_read_timeout 3600s`, gzip + `/icons`·`/uploads` 장기캐시.
+- 요청 제한: 인증 10/분·쓰기 80/분(IP별) + 로그인 계정별 잠금(10분 내 7회 실패→429). 업로드 8MB·이미지 MIME 화이트리스트.
+- 보안 헤더: `@fastify/helmet`로 CSP/HSTS/X-Frame-Options 등 적용(서버에서 자동).
 - 의존성: `fast-uri`는 overrides로 패치(3.1.2). 남은 fastify4 권고는 외부 미노출 토폴로지로 위험 낮음 →
   추후 fastify5 업그레이드 시 해소(플러그인 메이저 동반 필요, 별도 작업).
+
+---
+
+## 8. 강화 라운드 반영 배포 (2026-06-18) — ⚠️ compose 변경 포함
+
+이번 라운드(helmet/CSP·검색·이미지 리사이즈·PWA·헬스체크·graceful shutdown)는 **이미지뿐 아니라
+`docker-compose.yml`도 바뀜**(healthcheck·autoheal·`depends_on: service_healthy`). 파이의 compose를
+아래처럼 갱신한 뒤 배포한다. **새 .env 변수는 없음.**
+
+### 8-1. 바뀐 app 서비스 + 신규 autoheal (파이 docker-compose.yml에 반영)
+```yaml
+  app:
+    # ... 기존 image/expose/environment/volumes/networks 그대로 ...
+    restart: unless-stopped
+    healthcheck:                  # slim 이미지엔 curl/wget 없어 node 내장 fetch 사용
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - autoheal=true
+
+  autoheal:                       # unhealthy 컨테이너 자동 재시작(plain compose 보완)
+    image: willfarrell/autoheal:latest
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+```
+그리고 nginx 서비스의 `depends_on`을 long-form으로:
+```yaml
+  nginx:
+    depends_on:
+      app:
+        condition: service_healthy
+```
+
+### 8-2. 배포 & 확인
+```bash
+cd ~/School_Codemaru_RaspServer
+docker compose pull
+docker compose up -d
+docker compose ps              # app (healthy) + autoheal Up 확인 (start_period 20s 후)
+curl -s localhost/api/health   # {"ok":true}
+```
+- **스키마**: 부팅 시 `posts_fts`+트리거 자동 생성, 기존 글 1회 재색인(자동 마이그레이션) — 수동 작업 없음.
+- **데이터 보존**: DB·업로드는 볼륨 `square-data`. `pull`/`up`/이미지 교체로 안 지워짐(단 `down -v` 금지).
+- **배포 후 눈으로**: 게시판 검색창, 업로드 후 이미지 자동 축소, 모바일 "홈 화면에 추가"(PWA).
+- 새 네이티브 의존성 `sharp`는 app 이미지에 포함(ARM64 prebuilt). 로드 실패해도 업로드는 원본 저장으로 degrade.
