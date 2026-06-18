@@ -5,6 +5,8 @@ import { db } from '../db/index.js';
 import {
   hashPassword, verifyPassword, setSession, clearSession, readUser,
 } from '../lib/auth.js';
+import { levelInfo } from '../lib/level.js';
+import { hashCode } from '../lib/codes.js';
 
 const signupSchema = z.object({
   username: z.string().min(2).max(20),
@@ -20,9 +22,10 @@ export default async function authRoutes(app) {
   app.post('/signup', async (req, reply) => {
     const body = signupSchema.parse(req.body);
 
-    // 인증코드 검증: env(SIGNUP_CODES) 또는 signup_codes 테이블 사용
+    // 인증코드 검증: env(SIGNUP_CODES, 평문·개발용) 또는 signup_codes 테이블(해시 저장)
     const envCodes = (process.env.SIGNUP_CODES || '').split(',').map((s) => s.trim()).filter(Boolean);
-    const rowCode = db.prepare('SELECT * FROM signup_codes WHERE code=? AND used_by IS NULL').get(body.code);
+    const hashedCode = hashCode(body.code);
+    const rowCode = db.prepare('SELECT * FROM signup_codes WHERE code=? AND used_by IS NULL').get(hashedCode);
     const validByEnv = envCodes.includes(body.code);
     if (!rowCode && !validByEnv) return reply.code(400).send({ error: 'invalid_code' });
 
@@ -37,7 +40,7 @@ export default async function authRoutes(app) {
 
     if (rowCode) {
       db.prepare('UPDATE signup_codes SET used_by=?, used_at=datetime(\'now\') WHERE code=?')
-        .run(info.lastInsertRowid, body.code);
+        .run(info.lastInsertRowid, hashedCode);
     }
     const user = db.prepare('SELECT id, username, role FROM users WHERE id=?').get(info.lastInsertRowid);
     setSession(reply, user);
@@ -51,6 +54,9 @@ export default async function authRoutes(app) {
     }).parse(req.body);
     const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
     const ok = user && await verifyPassword(password, user.password_hash);
+    // 로그인 감사 로그(성공/실패). 운영자 모니터링용.
+    db.prepare('INSERT INTO admin_login_logs (user_id, username, ip, ua, success) VALUES (?,?,?,?,?)')
+      .run(user?.id ?? null, username, req.ip, req.headers['user-agent'] ?? null, ok ? 1 : 0);
     if (!ok) return reply.code(401).send({ error: 'invalid_credentials' });
     db.prepare('UPDATE users SET last_seen_at=datetime(\'now\') WHERE id=?').run(user.id);
     setSession(reply, user);
@@ -67,6 +73,7 @@ export default async function authRoutes(app) {
     const u = db.prepare(
       'SELECT id, username, nickname, grade, class_no, role, level, exp, verified FROM users WHERE id=?',
     ).get(sess.uid);
-    return u || reply.code(404).send({ error: 'not_found' });
+    if (!u) return reply.code(404).send({ error: 'not_found' });
+    return { ...u, ...levelInfo(u.exp) }; // level/into_level/level_span/next_exp 포함
   });
 }

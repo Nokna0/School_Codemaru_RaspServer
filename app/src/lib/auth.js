@@ -33,7 +33,12 @@ export function clearSession(reply) {
 }
 
 export function readUser(req) {
-  const tok = req.cookies?.[COOKIE];
+  // req.cookies(@fastify/cookie) 우선. WS 업그레이드 등 훅이 안 도는 경우 헤더에서 직접 파싱.
+  let tok = req.cookies?.[COOKIE];
+  if (!tok && req.headers?.cookie) {
+    const m = req.headers.cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`));
+    if (m) tok = decodeURIComponent(m[1]);
+  }
   if (!tok) return null;
   try { return jwt.verify(tok, SECRET); } catch { return null; }
 }

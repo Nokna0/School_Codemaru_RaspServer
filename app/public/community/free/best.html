@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>베스트 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container layout">
+    <main>
+      <div class="board-head">
+        <h1 class="board-title">🔥 베스트 / 핫이슈</h1>
+        <a class="btn btn--ghost" href="/community/free">자유게시판</a>
+      </div>
+      <div class="card">
+        <ul class="post-list" id="best-list"><li class="post-empty">불러오는 중…</li></ul>
+      </div>
+    </main>
+    <div id="app-sidebar"></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, mountSidebar, timeAgo, escapeHtml } from '/js/app.js';
+    mountHeader(); mountSidebar();
+
+    const listEl = document.getElementById('best-list');
+    function row(p, i) {
+      return `<li class="post-row" onclick="location.href='/community/free/view?id=${p.id}'">
+        <div class="post-row__main">
+          <span class="best-rank">${i + 1}</span>
+          <span class="post-row__title">${escapeHtml(p.title)}</span>
+          ${p.comment_count ? `<span class="post-row__cc">[${p.comment_count}]</span>` : ''}
+        </div>
+        <div class="post-row__meta">
+          <span>${escapeHtml(p.author_name)}</span><span>·</span>
+          <span>${timeAgo(p.created_at)}</span><span>·</span>
+          <span>조회 ${p.view_count}</span><span>·</span>
+          <span>❤ ${p.like_count}</span>
+        </div>
+      </li>`;
+    }
+    try {
+      const { items } = await api('/api/posts/best');
+      listEl.innerHTML = items.length
+        ? items.map(row).join('')
+        : '<li class="post-empty">아직 인기 글이 없어요. 추천과 댓글이 쌓이면 여기에 표시됩니다.</li>';
+    } catch {
+      listEl.innerHTML = '<li class="post-empty">목록을 불러오지 못했습니다.</li>';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>모집글 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container" style="max-width:760px">
+    <div class="board-head"><a class="btn btn--ghost" href="/community/free/jobs">← 구인구직</a></div>
+    <div class="card"><div class="post-detail" id="detail">불러오는 중…</div></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, getMe, timeAgo, escapeHtml } from '/js/app.js';
+    mountHeader();
+    const id = Number(new URLSearchParams(location.search).get('id'));
+    const detail = document.getElementById('detail');
+
+    async function load() {
+      const me = await getMe();
+      let data;
+      try { data = await api(`/api/jobs/${id}`); }
+      catch { detail.innerHTML = '<p class="muted">모집글을 찾을 수 없습니다.</p>'; return; }
+      const j = data.job;
+      const isOwner = me && me.id === j.author_id;
+      detail.innerHTML = `
+        <div style="margin-bottom:8px">
+          ${j.status === 'closed' ? '<span class="badge-closed">마감</span>' : '<span class="badge-open">모집중</span>'}
+          ${j.activity_type ? `<span class="tag">${escapeHtml(j.activity_type)}</span>` : ''}
+          ${j.fields.map((f) => `<span class="tag tag--field">${escapeHtml(f)}</span>`).join('')}
+        </div>
+        <h1 class="post-detail__title">${escapeHtml(j.title)}</h1>
+        <div class="post-detail__meta">
+          <span>${escapeHtml(j.author_name)}</span><span>·</span>
+          <span>${timeAgo(j.created_at)}</span><span>·</span><span>조회 ${j.view_count}</span>
+        </div>
+        <div class="post-detail__body">${escapeHtml(j.content)}</div>
+        ${isOwner ? `<div class="like-bar">
+          <button class="btn btn--ghost" id="toggle-status">${j.status === 'open' ? '모집 마감하기' : '다시 모집하기'}</button>
+        </div>` : ''}`;
+      if (isOwner) {
+        document.getElementById('toggle-status').addEventListener('click', async () => {
+          const next = j.status === 'open' ? 'closed' : 'open';
+          try { await api(`/api/jobs/${id}/status`, { method: 'POST', body: { status: next } }); load(); }
+          catch { alert('변경에 실패했습니다.'); }
+        });
+      }
+    }
+    if (!id) detail.innerHTML = '<p class="muted">잘못된 접근입니다.</p>'; else load();
+  </script>
+</body>
+</html>

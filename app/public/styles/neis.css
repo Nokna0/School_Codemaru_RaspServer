@@ -1,0 +1,34 @@
+/* 급식 / 시간표 스타일 */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.section-head h1, .section-head h2 { margin: 0; }
+.date-nav { display: flex; align-items: center; gap: 8px; }
+.date-nav .cur { font-weight: 700; min-width: 150px; text-align: center; }
+.nav-btn { width: 34px; height: 34px; border: 1px solid var(--border); background: #fff; border-radius: 8px; cursor: pointer; font-size: 16px; }
+.nav-btn:hover { background: var(--brand-light); }
+
+/* 급식 카드 */
+.meal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 760px) { .meal-grid { grid-template-columns: 1fr; } }
+.meal-card { display: flex; flex-direction: column; }
+.meal-card__type { font-weight: 700; color: var(--brand); margin: 0 0 10px; font-size: 15px; }
+.meal-menu { list-style: none; margin: 0 0 12px; padding: 0; flex: 1; }
+.meal-menu li { font-size: 14px; padding: 3px 0; color: var(--text); }
+.meal-card__cal { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.rating { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.stars { display: inline-flex; font-size: 20px; line-height: 1; cursor: pointer; }
+.stars[data-readonly="1"] { cursor: default; }
+.star { color: #d8dee9; transition: color .1s; }
+.star.on { color: #f5b50a; }
+.rating__avg { font-size: 13px; color: var(--text-muted); }
+.empty-state { text-align: center; color: var(--text-muted); padding: 36px 16px; }
+
+/* 시간표 표 */
+.tt-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.tt-controls select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: #fff; }
+.tt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tt-table th, .tt-table td { border: 1px solid var(--border); padding: 8px 6px; text-align: center; }
+.tt-table thead th { background: var(--brand-light); color: var(--brand-dark); font-weight: 700; }
+.tt-table tbody th { background: #f8fafc; color: var(--text-muted); font-weight: 600; width: 48px; }
+.tt-table td.today { background: #fffdf2; }
+.tt-table td:empty::after { content: '·'; color: #cfd6e0; }
+.tt-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; }

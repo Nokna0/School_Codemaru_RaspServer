@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>자유게시판 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container layout">
+    <main>
+      <div class="board-head">
+        <h1 class="board-title">자유게시판</h1>
+        <a class="btn btn--primary" href="/community/free/new">글쓰기</a>
+      </div>
+      <div class="card">
+        <ul class="post-list" id="post-list"><li class="post-empty">불러오는 중…</li></ul>
+      </div>
+      <div class="pager" id="pager"></div>
+    </main>
+    <div id="app-sidebar"></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, mountSidebar, timeAgo, escapeHtml } from '/js/app.js';
+    mountHeader(); mountSidebar();
+
+    const params = new URLSearchParams(location.search);
+    const page = Math.max(Number(params.get('page')) || 1, 1);
+    const listEl = document.getElementById('post-list');
+
+    function row(p) {
+      return `<li class="post-row" onclick="location.href='/community/free/view?id=${p.id}'">
+        <div class="post-row__main">
+          <span class="post-row__title">${escapeHtml(p.title)}</span>
+          ${p.comment_count ? `<span class="post-row__cc">[${p.comment_count}]</span>` : ''}
+        </div>
+        <div class="post-row__meta">
+          <span>${escapeHtml(p.author_name)}</span><span>·</span>
+          <span>${timeAgo(p.created_at)}</span><span>·</span>
+          <span>조회 ${p.view_count}</span><span>·</span>
+          <span>❤ ${p.like_count}</span>
+        </div>
+      </li>`;
+    }
+
+    try {
+      const { items, total, size } = await api(`/api/posts?board=free&page=${page}`);
+      listEl.innerHTML = items.length
+        ? items.map(row).join('')
+        : '<li class="post-empty">아직 글이 없어요. 첫 글을 남겨보세요!</li>';
+      const pages = Math.max(Math.ceil(total / size), 1);
+      if (pages > 1) {
+        const pager = document.getElementById('pager');
+        let h = '';
+        for (let i = 1; i <= pages; i++) {
+          h += `<a class="page-link${i === page ? ' active' : ''}" href="?page=${i}">${i}</a>`;
+        }
+        pager.innerHTML = h;
+      }
+    } catch (e) {
+      listEl.innerHTML = '<li class="post-empty">목록을 불러오지 못했습니다.</li>';
+    }
+  </script>
+</body>
+</html>

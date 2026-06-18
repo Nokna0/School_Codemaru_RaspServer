@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>급식 · 시간표 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/neis.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container">
+    <!-- 급식 -->
+    <section class="card" style="margin-bottom:24px"><div class="card__body">
+      <div class="section-head">
+        <h1 class="board-title" style="font-size:22px">오늘의 급식</h1>
+        <div class="date-nav">
+          <button class="nav-btn" id="meal-prev">‹</button>
+          <span class="cur" id="meal-date"></span>
+          <button class="nav-btn" id="meal-next">›</button>
+          <button class="btn btn--ghost" id="meal-today" style="margin-left:6px">오늘</button>
+        </div>
+      </div>
+      <div id="meal-body"><p class="empty-state">불러오는 중…</p></div>
+    </div></section>
+
+    <!-- 시간표 -->
+    <section class="card"><div class="card__body">
+      <div class="section-head"><h2 class="board-title" style="font-size:20px">시간표</h2></div>
+      <div class="tt-controls">
+        <select id="tt-grade"></select>
+        <select id="tt-class"></select>
+        <button class="nav-btn" id="tt-prev">‹</button>
+        <span class="cur" id="tt-week"></span>
+        <button class="nav-btn" id="tt-next">›</button>
+        <button class="btn btn--ghost" id="tt-thisweek">이번주</button>
+      </div>
+      <div id="tt-body"><p class="empty-state">불러오는 중…</p></div>
+      <p class="tt-note">기본은 1학년 1반입니다. (마이페이지에서 학년/반 저장 기능은 추후 추가)</p>
+    </div></section>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, getMe, escapeHtml } from '/js/app.js';
+    const me = await mountHeader();
+
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const DOW = ['일','월','화','수','목','금','토'];
+
+    /* ===== 급식 ===== */
+    let mealDate = new Date();
+    const mealBody = document.getElementById('meal-body');
+    const TYPE_KO = { breakfast: '조식', lunch: '중식', dinner: '석식' };
+
+    function starsHtml(type, rating) {
+      const mine = rating.mine || 0;
+      const ro = me ? '0' : '1';
+      let s = `<span class="stars" data-type="${type}" data-readonly="${ro}">`;
+      for (let i = 1; i <= 5; i++) s += `<span class="star${i <= mine ? ' on' : ''}" data-v="${i}">★</span>`;
+      s += '</span>';
+      const avg = rating.count ? `평균 ${rating.avg}/5 (${rating.count})` : '아직 평가 없음';
+      return `<div class="rating">${s}<span class="rating__avg">${avg}</span></div>`;
+    }
+
+    async function loadMeal() {
+      document.getElementById('meal-date').textContent =
+        `${fmt(mealDate)} (${DOW[mealDate.getDay()]})`;
+      const date = fmt(mealDate);
+      let data;
+      try { data = await api(`/api/neis/meal?date=${date}`); }
+      catch { mealBody.innerHTML = '<p class="empty-state">급식 정보를 불러오지 못했습니다.</p>'; return; }
+
+      if (!data.configured) {
+        mealBody.innerHTML = '<p class="empty-state">NEIS 연동 준비 중입니다. (.env에 NEIS 키 입력 시 표시)</p>';
+        return;
+      }
+      if (!data.meals.length) {
+        mealBody.innerHTML = '<p class="empty-state">이 날은 급식 정보가 없습니다. (주말/방학/휴업일)</p>';
+        return;
+      }
+      mealBody.innerHTML = `<div class="meal-grid">${data.meals.map((m) => `
+        <div class="card meal-card"><div class="card__body">
+          <p class="meal-card__type">${TYPE_KO[m.type] || m.type}</p>
+          <ul class="meal-menu">${m.menu.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>
+          ${m.calorie ? `<div class="meal-card__cal">${escapeHtml(m.calorie)}</div>` : ''}
+          ${starsHtml(m.type, m.rating)}
+        </div></div>`).join('')}</div>`;
+      wireStars(date);
+    }
+
+    function wireStars(date) {
+      mealBody.querySelectorAll('.stars[data-readonly="0"]').forEach((el) => {
+        el.querySelectorAll('.star').forEach((st) => {
+          st.addEventListener('click', async () => {
+            const stars = Number(st.dataset.v);
+            try {
+              const r = await api('/api/neis/meal/rating', { method: 'POST',
+                body: { date, type: el.dataset.type, stars } });
+              el.querySelectorAll('.star').forEach((x) =>
+                x.classList.toggle('on', Number(x.dataset.v) <= r.mine));
+              el.parentElement.querySelector('.rating__avg').textContent =
+                r.count ? `평균 ${r.avg}/5 (${r.count})` : '아직 평가 없음';
+            } catch { alert('별점 등록에 실패했습니다.'); }
+          });
+        });
+      });
+    }
+
+    document.getElementById('meal-prev').onclick = () => { mealDate.setDate(mealDate.getDate()-1); loadMeal(); };
+    document.getElementById('meal-next').onclick = () => { mealDate.setDate(mealDate.getDate()+1); loadMeal(); };
+    document.getElementById('meal-today').onclick = () => { mealDate = new Date(); loadMeal(); };
+
+    /* ===== 시간표 ===== */
+    const gradeSel = document.getElementById('tt-grade');
+    const classSel = document.getElementById('tt-class');
+    for (let g = 1; g <= 3; g++) gradeSel.add(new Option(`${g}학년`, g));
+    for (let c = 1; c <= 11; c++) classSel.add(new Option(`${c}반`, c));
+    gradeSel.value = me?.grade || 1;
+    classSel.value = me?.class_no || 1;
+    let ttWeek = new Date();
+    const ttBody = document.getElementById('tt-body');
+
+    async function loadTT() {
+      const week = fmt(ttWeek);
+      let d;
+      try { d = await api(`/api/timetable?grade=${gradeSel.value}&classNo=${classSel.value}&week=${week}`); }
+      catch { ttBody.innerHTML = '<p class="empty-state">시간표를 불러오지 못했습니다.</p>'; return; }
+      document.getElementById('tt-week').textContent = `${d.week.from} ~ ${d.week.to}`;
+
+      if (!d.configured) {
+        ttBody.innerHTML = '<p class="empty-state">NEIS 연동 준비 중입니다. (.env에 NEIS 키 입력 시 표시)</p>';
+        return;
+      }
+      const today = fmt(new Date());
+      const hasAny = d.days.some((day) => Object.keys(day.slots).length);
+      if (!hasAny) {
+        ttBody.innerHTML = '<p class="empty-state">이 주의 시간표 정보가 없습니다.</p>';
+        return;
+      }
+      let head = '<tr><th>교시</th>';
+      d.days.forEach((day) => {
+        const dt = new Date(`${day.date}T00:00:00`);
+        head += `<th>${DOW[dt.getDay()]}<br><small>${day.date.slice(5)}</small></th>`;
+      });
+      head += '</tr>';
+      let rows = '';
+      for (let p = 1; p <= d.maxPeriod; p++) {
+        rows += `<tr><th>${p}</th>`;
+        d.days.forEach((day) => {
+          const cls = day.date === today ? ' class="today"' : '';
+          rows += `<td${cls}>${escapeHtml(day.slots[p] || '')}</td>`;
+        });
+        rows += '</tr>';
+      }
+      ttBody.innerHTML = `<table class="tt-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+    }
+
+    gradeSel.onchange = loadTT; classSel.onchange = loadTT;
+    document.getElementById('tt-prev').onclick = () => { ttWeek.setDate(ttWeek.getDate()-7); loadTT(); };
+    document.getElementById('tt-next').onclick = () => { ttWeek.setDate(ttWeek.getDate()+7); loadTT(); };
+    document.getElementById('tt-thisweek').onclick = () => { ttWeek = new Date(); loadTT(); };
+
+    loadMeal(); loadTT();
+  </script>
+</body>
+</html>

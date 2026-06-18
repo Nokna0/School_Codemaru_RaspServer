@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>쪽지 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container" style="max-width:760px">
+    <div class="board-head"><h1 class="board-title">쪽지</h1></div>
+
+    <div class="card" style="margin-bottom:16px"><div class="card__body">
+      <h2 class="card__title">쪽지 보내기</h2>
+      <div class="form-msg" id="msg"></div>
+      <form id="send-form">
+        <div class="field-row">
+          <div class="field" style="flex:0 0 200px">
+            <label for="recipient">받는 사람(아이디)</label>
+            <input id="recipient" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="content">내용</label>
+          <textarea id="content" maxlength="2000" required style="min-height:90px"></textarea>
+        </div>
+        <div style="text-align:right"><button class="btn btn--primary" type="submit" id="send-btn">보내기</button></div>
+      </form>
+    </div></div>
+
+    <div class="card"><div class="card__body">
+      <h2 class="card__title">받은 편지함</h2>
+      <div id="inbox"><p class="muted">불러오는 중…</p></div>
+    </div></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, requireLogin, timeAgo, escapeHtml } from '/js/app.js';
+    mountHeader();
+    await requireLogin();
+
+    const inbox = document.getElementById('inbox');
+    async function loadInbox() {
+      try {
+        const { items } = await api('/api/messages/inbox');
+        inbox.innerHTML = items.length ? items.map((m) => `
+          <div class="msg-row${m.is_read ? '' : ' unread'}">
+            <div class="msg-row__head"><b>${escapeHtml(m.sender_name)}</b>
+              <span class="muted">${timeAgo(m.created_at)}</span></div>
+            <div class="msg-row__body">${escapeHtml(m.content)}</div>
+            <button class="comment__reply-btn" data-reply="${escapeHtml(m.sender_name)}">답장</button>
+          </div>`).join('') : '<p class="muted">받은 쪽지가 없어요.</p>';
+        await api('/api/messages/read', { method: 'POST', body: {} });
+        inbox.querySelectorAll('[data-reply]').forEach((b) => b.addEventListener('click', () => {
+          document.getElementById('recipient').value = b.dataset.reply;
+          document.getElementById('content').focus();
+        }));
+      } catch { inbox.innerHTML = '<p class="muted">불러오지 못했습니다.</p>'; }
+    }
+
+    const form = document.getElementById('send-form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('send-btn');
+    const ERR = { recipient_not_found: '받는 사람을 찾을 수 없어요.', cannot_message_self: '자기 자신에게는 보낼 수 없어요.' };
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'form-msg'; btn.disabled = true;
+      try {
+        await api('/api/messages', { method: 'POST', body: {
+          recipient: form.recipient.value.trim(), content: form.content.value,
+        }});
+        msg.textContent = '쪽지를 보냈어요.'; msg.className = 'form-msg ok';
+        form.content.value = '';
+      } catch (err) {
+        msg.textContent = ERR[err.message] || '전송에 실패했습니다.'; msg.className = 'form-msg error';
+      }
+      btn.disabled = false;
+    });
+    loadInbox();
+  </script>
+</body>
+</html>

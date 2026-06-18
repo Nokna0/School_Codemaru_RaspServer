@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>게시글 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container layout">
+    <main>
+      <div class="board-head">
+        <a class="btn btn--ghost" href="/community/free">← 목록</a>
+      </div>
+      <div class="card"><div class="post-detail" id="detail">불러오는 중…</div></div>
+    </main>
+    <div id="app-sidebar"></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, mountSidebar, getMe, timeAgo, escapeHtml } from '/js/app.js';
+    mountHeader(); mountSidebar();
+
+    const id = Number(new URLSearchParams(location.search).get('id'));
+    const detail = document.getElementById('detail');
+    let me = null;
+
+    function commentNode(c) {
+      return `<div class="comment${c.parent_id ? ' reply' : ''}">
+        <div class="comment__head">
+          <span class="comment__author">${escapeHtml(c.author_name)}</span>
+          <span class="comment__time">${timeAgo(c.created_at)}</span>
+        </div>
+        <div class="comment__body">${escapeHtml(c.content)}</div>
+        ${me && !c.parent_id ? `<button class="comment__reply-btn" data-reply="${c.id}">답글</button>` : ''}
+      </div>`;
+    }
+
+    // 부모 → 자식 순서로 정렬(대댓글 1단계)
+    function orderComments(list) {
+      const roots = list.filter((c) => !c.parent_id);
+      const out = [];
+      roots.forEach((r) => {
+        out.push(r);
+        list.filter((c) => c.parent_id === r.id).forEach((ch) => out.push(ch));
+      });
+      // 부모 없이 남은 대댓글(부모 삭제 등)도 표시
+      list.filter((c) => c.parent_id && !roots.some((r) => r.id === c.parent_id)).forEach((c) => out.push(c));
+      return out;
+    }
+
+    async function load() {
+      me = await getMe();
+      let data;
+      try { data = await api(`/api/posts/${id}`); }
+      catch { detail.innerHTML = '<p class="muted">글을 찾을 수 없습니다.</p>'; return; }
+      const { post, comments, liked } = data;
+
+      const imgs = (post.image_urls || []).map((u) => `<img src="${u}" alt="첨부 이미지">`).join('');
+      const ordered = orderComments(comments);
+
+      detail.innerHTML = `
+        <h1 class="post-detail__title">${escapeHtml(post.title)}</h1>
+        <div class="post-detail__meta">
+          <span>${escapeHtml(post.author_name)}</span><span>·</span>
+          <span>${timeAgo(post.created_at)}</span><span>·</span>
+          <span>조회 ${post.view_count}</span>
+        </div>
+        <div class="post-detail__body">${escapeHtml(post.content)}</div>
+        ${imgs ? `<div class="post-detail__images">${imgs}</div>` : ''}
+        <div class="like-bar">
+          <button class="like-btn${liked ? ' on' : ''}" id="like-btn">❤ 추천 <span id="like-count">${post.like_count}</span></button>
+        </div>
+        <div class="comments">
+          <h2 class="comments__title">댓글 <span id="cc">${comments.length}</span></h2>
+          <div id="comment-list">${ordered.map(commentNode).join('') || '<p class="muted">첫 댓글을 남겨보세요.</p>'}</div>
+          ${me ? commentFormHtml() : '<p class="muted" style="margin-top:14px">댓글을 쓰려면 <a href="/login">로그인</a>하세요.</p>'}
+        </div>`;
+
+      if (me) wireCommentForm();
+      wireLike(liked);
+      wireReplyButtons();
+    }
+
+    function commentFormHtml() {
+      return `<form class="comment-form" id="comment-form">
+        <div class="reply-hint" id="reply-hint" style="display:none"></div>
+        <textarea id="comment-input" placeholder="댓글을 입력하세요" maxlength="1000" required></textarea>
+        <div class="comment-form__actions">
+          <label class="checkbox-inline"><input type="checkbox" id="comment-anon"> 익명</label>
+          <button class="btn btn--primary" type="submit">댓글 등록</button>
+        </div>
+      </form>`;
+    }
+
+    let replyTo = null;
+    function wireReplyButtons() {
+      detail.querySelectorAll('[data-reply]').forEach((b) => {
+        b.addEventListener('click', () => {
+          replyTo = Number(b.dataset.reply);
+          const hint = document.getElementById('reply-hint');
+          if (hint) {
+            hint.style.display = 'block';
+            hint.innerHTML = `↳ 답글 작성 중 <button type="button" id="cancel-reply" style="background:none;border:0;color:var(--text-muted);cursor:pointer">취소</button>`;
+            document.getElementById('cancel-reply').addEventListener('click', () => { replyTo = null; hint.style.display = 'none'; });
+          }
+          document.getElementById('comment-input')?.focus();
+        });
+      });
+    }
+
+    function wireLike(initial) {
+      const btn = document.getElementById('like-btn');
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        if (!me) { location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
+        btn.disabled = true;
+        try {
+          const { liked, like_count } = await api(`/api/posts/${id}/like`, { method: 'POST', body: {} });
+          btn.classList.toggle('on', liked);
+          document.getElementById('like-count').textContent = like_count;
+        } catch { /* 무시 */ }
+        btn.disabled = false;
+      });
+    }
+
+    function wireCommentForm() {
+      const form = document.getElementById('comment-form');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('comment-input');
+        const content = input.value.trim();
+        if (!content) return;
+        try {
+          await api(`/api/posts/${id}/comments`, { method: 'POST', body: {
+            content,
+            isAnonymous: document.getElementById('comment-anon').checked,
+            ...(replyTo ? { parentId: replyTo } : {}),
+          }});
+          replyTo = null;
+          await load(); // 새로고침
+        } catch { alert('댓글 등록에 실패했습니다.'); }
+      });
+    }
+
+    if (!id) detail.innerHTML = '<p class="muted">잘못된 접근입니다.</p>';
+    else load();
+  </script>
+</body>
+</html>

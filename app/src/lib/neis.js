@@ -6,7 +6,15 @@ const OFCDC = process.env.NEIS_ATPT_OFCDC_SC_CODE || 'M10'; // 충북교육청
 const SCHUL = process.env.NEIS_SD_SCHUL_CODE;               // 청주고 표준학교코드
 
 function q(params) {
-  return new URLSearchParams({ KEY, Type: 'json', pIndex: '1', pSize: '100', ...params }).toString();
+  const base = { Type: 'json', pIndex: '1', pSize: '100', ...params };
+  if (KEY) base.KEY = KEY; // 키 있으면 포함(높은 호출 한도). 없으면 키 없이 샘플 조회(한도 낮음).
+  return new URLSearchParams(base).toString();
+}
+
+// 학교코드만 있으면 조회 가능(NEIS는 키 없이도 샘플 조회 허용, 결과는 DB 캐시).
+// 키는 선택(높은 한도용). 학교코드도 없으면 화면은 "준비 중"으로 동작.
+export function neisConfigured() {
+  return Boolean(SCHUL);
 }
 
 // 급식: date = 'YYYYMMDD'. 반환: [{ type, menu, calorie, origin }]

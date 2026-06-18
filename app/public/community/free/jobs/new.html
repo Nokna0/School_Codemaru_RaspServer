@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>모집글 작성 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container" style="max-width:760px">
+    <div class="board-head"><h1 class="board-title">모집글 작성</h1></div>
+    <div class="card"><div class="card__body">
+      <div class="form-msg" id="msg"></div>
+      <form class="write-form" id="job-form">
+        <div class="field">
+          <label for="title">제목</label>
+          <input id="title" maxlength="120" required>
+        </div>
+        <div class="field">
+          <label>활동 유형</label>
+          <div class="filter-block" id="activities"></div>
+        </div>
+        <div class="field">
+          <label>분야 (복수 선택, 최대 8)</label>
+          <div class="filter-block" id="fields"></div>
+        </div>
+        <div class="field">
+          <label for="content">내용</label>
+          <textarea id="content" required placeholder="활동 목표, 모집 인원, 일정 등을 적어주세요."></textarea>
+        </div>
+        <div class="write-actions">
+          <span></span>
+          <div style="display:flex;gap:8px">
+            <a class="btn btn--ghost" href="/community/free/jobs">취소</a>
+            <button class="btn btn--primary" type="submit" id="submit">등록</button>
+          </div>
+        </div>
+      </form>
+    </div></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, requireLogin } from '/js/app.js';
+    mountHeader();
+    await requireLogin();
+
+    const selFields = new Set();
+    let selActivity = '';
+    const { groups, activities } = await api('/api/jobs/categories');
+    const af = document.getElementById('activities');
+    af.innerHTML = activities.map((a) => `<button type="button" class="chip" data-act="${a}">${a}</button>`).join('');
+    af.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      selActivity = selActivity === b.dataset.act ? '' : b.dataset.act;
+      af.querySelectorAll('[data-act]').forEach((x) => x.classList.toggle('on', x.dataset.act === selActivity));
+    });
+    const ff = document.getElementById('fields');
+    ff.innerHTML = Object.values(groups).flat().map((f) => `<button type="button" class="chip" data-field="${f}">${f}</button>`).join('');
+    ff.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-field]'); if (!b) return;
+      const f = b.dataset.field;
+      if (selFields.has(f)) selFields.delete(f);
+      else { if (selFields.size >= 8) return; selFields.add(f); }
+      b.classList.toggle('on', selFields.has(f));
+    });
+
+    const form = document.getElementById('job-form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('submit');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true; btn.textContent = '등록 중…';
+      try {
+        const { id } = await api('/api/jobs', { method: 'POST', body: {
+          title: form.title.value.trim(),
+          content: form.content.value,
+          fields: [...selFields],
+          ...(selActivity ? { activityType: selActivity } : {}),
+        }});
+        location.href = `/community/free/jobs/view?id=${id}`;
+      } catch {
+        msg.textContent = '등록에 실패했습니다. 입력값을 확인해주세요.';
+        msg.className = 'form-msg error';
+        btn.disabled = false; btn.textContent = '등록';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>글쓰기 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container" style="max-width:760px">
+    <div class="board-head"><h1 class="board-title">글쓰기</h1></div>
+    <div class="card"><div class="card__body">
+      <div class="form-msg" id="msg"></div>
+      <form class="write-form" id="write-form">
+        <div class="field">
+          <label for="title">제목</label>
+          <input id="title" name="title" maxlength="120" required>
+        </div>
+        <div class="field">
+          <label for="content">내용</label>
+          <textarea id="content" name="content" required></textarea>
+        </div>
+        <div class="field">
+          <label>이미지 첨부</label>
+          <div class="upload-row">
+            <input type="file" id="files" accept="image/*" multiple hidden>
+            <button type="button" class="btn btn--ghost" id="pick-btn">이미지 선택</button>
+            <span class="muted" id="upload-status"></span>
+          </div>
+          <div class="thumb-list" id="thumbs" style="margin-top:10px"></div>
+        </div>
+        <div class="write-actions">
+          <label class="checkbox-inline"><input type="checkbox" id="anon"> 익명으로 작성</label>
+          <div style="display:flex;gap:8px">
+            <a class="btn btn--ghost" href="/community/free">취소</a>
+            <button class="btn btn--primary" type="submit" id="submit">등록</button>
+          </div>
+        </div>
+      </form>
+    </div></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, requireLogin, escapeHtml } from '/js/app.js';
+    mountHeader();
+    await requireLogin();
+
+    const msg = document.getElementById('msg');
+    const thumbs = document.getElementById('thumbs');
+    const status = document.getElementById('upload-status');
+    const uploaded = []; // 업로드된 url 목록
+
+    document.getElementById('pick-btn').addEventListener('click', () => document.getElementById('files').click());
+
+    document.getElementById('files').addEventListener('change', async (e) => {
+      const files = [...e.target.files];
+      e.target.value = '';
+      if (!files.length) return;
+      if (uploaded.length + files.length > 10) { status.textContent = '이미지는 최대 10장입니다.'; return; }
+      status.textContent = '업로드 중…';
+      try {
+        const fd = new FormData();
+        files.forEach((f) => fd.append('files', f));
+        const res = await fetch('/api/upload', { method: 'POST', credentials: 'same-origin', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'upload_failed');
+        data.urls.forEach((u) => { uploaded.push(u); addThumb(u); });
+        status.textContent = `${uploaded.length}장 첨부됨`;
+      } catch (err) {
+        const M = { unsupported_type: '지원하지 않는 형식입니다.', file_too_large: '파일이 너무 큽니다(최대 8MB).' };
+        status.textContent = M[err.message] || '업로드에 실패했습니다.';
+      }
+    });
+
+    function addThumb(url) {
+      const div = document.createElement('div');
+      div.className = 'thumb';
+      div.innerHTML = `<img src="${url}" alt=""><button type="button" title="삭제">×</button>`;
+      div.querySelector('button').addEventListener('click', () => {
+        const i = uploaded.indexOf(url);
+        if (i >= 0) uploaded.splice(i, 1);
+        div.remove();
+        status.textContent = uploaded.length ? `${uploaded.length}장 첨부됨` : '';
+      });
+      thumbs.appendChild(div);
+    }
+
+    const form = document.getElementById('write-form');
+    const btn = document.getElementById('submit');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'form-msg';
+      btn.disabled = true; btn.textContent = '등록 중…';
+      try {
+        const { id } = await api('/api/posts', { method: 'POST', body: {
+          board: 'free',
+          title: form.title.value.trim(),
+          content: form.content.value,
+          isAnonymous: form.anon.checked,
+          imageUrls: uploaded,
+        }});
+        location.href = `/community/free/view?id=${id}`;
+      } catch (err) {
+        msg.textContent = '등록에 실패했습니다. 입력값을 확인해주세요.';
+        msg.className = 'form-msg error';
+        btn.disabled = false; btn.textContent = '등록';
+      }
+    });
+  </script>
+</body>
+</html>

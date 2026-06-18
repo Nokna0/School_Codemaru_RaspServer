@@ -12,14 +12,27 @@ services:
     image: nokna/app:latest
     expose:
       - "3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PATH=/data/square.db
+      - UPLOAD_DIR=/data/uploads
+      - NEIS_API_KEY=${NEIS_API_KEY}
+      - NEIS_ATPT_OFCDC_SC_CODE=${NEIS_ATPT_OFCDC_SC_CODE:-M10}
+      - NEIS_SD_SCHUL_CODE=${NEIS_SD_SCHUL_CODE}
+      - SIGNUP_CODES=${SIGNUP_CODES}
+    volumes:
+      - square-data:/data          # SQLite DB + 업로드 영구 보존 (없으면 재시작 시 소실!)
     networks:
       - webnet
+    restart: unless-stopped
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel --no-autoupdate run
     environment:
-      - TUNNEL_TOKEN=
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     depends_on:
       - nginx
     networks:
@@ -29,3 +42,6 @@ services:
 networks:
   webnet:
     driver: bridge
+
+volumes:
+  square-data:

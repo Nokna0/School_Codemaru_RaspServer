@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>구인구직 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container">
+    <div class="board-head">
+      <div>
+        <h1 class="board-title">구인구직</h1>
+        <p class="muted" style="margin:4px 0 0">스터디·프로젝트·대회 팀원을 찾는 공간</p>
+      </div>
+      <a class="btn btn--primary" href="/community/free/jobs/new">모집글 작성</a>
+    </div>
+
+    <div class="card" style="margin-bottom:16px"><div class="card__body">
+      <div class="filter-block" id="field-filters"></div>
+      <div class="filter-block" id="activity-filters" style="margin-top:10px"></div>
+      <div id="interest-hint" class="muted" style="margin-top:8px"></div>
+    </div></div>
+
+    <div class="card">
+      <ul class="post-list" id="job-list"><li class="post-empty">불러오는 중…</li></ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, timeAgo, escapeHtml } from '/js/app.js';
+    const me = await mountHeader();
+
+    const selFields = new Set();
+    let selActivity = '';
+
+    const { groups, activities } = await api('/api/jobs/categories');
+    // 분야 칩(그룹별)
+    const fb = document.getElementById('field-filters');
+    fb.innerHTML = '<span class="filter-label">분야</span>' + Object.entries(groups).map(([g, arr]) =>
+      arr.map((f) => `<button class="chip" data-field="${f}">${f}</button>`).join('')).join('');
+    // 활동 칩
+    const ab = document.getElementById('activity-filters');
+    ab.innerHTML = '<span class="filter-label">활동</span>' +
+      activities.map((a) => `<button class="chip" data-act="${a}">${a}</button>`).join('');
+
+    // 로그인 사용자: 관심분야 기본 선택
+    if (me) {
+      try {
+        const { interests } = await api('/api/me/interests');
+        interests.forEach((f) => selFields.add(f));
+        if (interests.length) document.getElementById('interest-hint').textContent = '내 관심분야로 필터링했어요. 칩을 눌러 변경할 수 있어요.';
+      } catch { /* 무시 */ }
+    }
+
+    function syncChips() {
+      fb.querySelectorAll('[data-field]').forEach((b) => b.classList.toggle('on', selFields.has(b.dataset.field)));
+      ab.querySelectorAll('[data-act]').forEach((b) => b.classList.toggle('on', b.dataset.act === selActivity));
+    }
+    fb.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-field]'); if (!b) return;
+      const f = b.dataset.field; selFields.has(f) ? selFields.delete(f) : selFields.add(f);
+      syncChips(); load();
+    });
+    ab.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      selActivity = selActivity === b.dataset.act ? '' : b.dataset.act;
+      syncChips(); load();
+    });
+
+    const listEl = document.getElementById('job-list');
+    function row(j) {
+      return `<li class="post-row" onclick="location.href='/community/free/jobs/view?id=${j.id}'">
+        <div class="post-row__main">
+          ${j.status === 'closed' ? '<span class="badge-closed">마감</span>' : '<span class="badge-open">모집중</span>'}
+          <span class="post-row__title">${escapeHtml(j.title)}</span>
+        </div>
+        <div class="post-row__meta">
+          ${j.activity_type ? `<span class="tag">${escapeHtml(j.activity_type)}</span>` : ''}
+          ${j.fields.map((f) => `<span class="tag tag--field">${escapeHtml(f)}</span>`).join('')}
+          <span>· ${escapeHtml(j.author_name)} · ${timeAgo(j.created_at)}</span>
+        </div>
+      </li>`;
+    }
+    async function load() {
+      const q = new URLSearchParams();
+      if (selFields.size) q.set('fields', [...selFields].join(','));
+      if (selActivity) q.set('activity', selActivity);
+      try {
+        const { items } = await api(`/api/jobs?${q}`);
+        listEl.innerHTML = items.length ? items.map(row).join('')
+          : '<li class="post-empty">조건에 맞는 모집글이 없어요.</li>';
+      } catch { listEl.innerHTML = '<li class="post-empty">목록을 불러오지 못했습니다.</li>'; }
+    }
+    syncChips(); load();
+  </script>
+</body>
+</html>

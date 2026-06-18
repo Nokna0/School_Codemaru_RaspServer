@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Square | 청주고등학교 커뮤니티</title>
+  <meta name="description" content="청주고등학교 학생들을 위한 커뮤니티 Square">
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles/app.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <main>
+    <section class="hero">
+      <h1>청주고 학생들만의<br><span class="accent">자유로운 공간</span></h1>
+      <p>자유게시판, 시간표, 급식 정보까지. 청주고의 모든 것이 여기 있습니다.</p>
+      <div class="hero-actions" id="hero-actions"></div>
+
+      <div id="home-meta" class="home-meta"></div>
+
+      <div class="feature-grid">
+        <div class="feature"><h3>자유게시판</h3><p>익명으로 부담 없이, 학생들의 이야기를 안전하게 나누는 공간.</p></div>
+        <div class="feature"><h3>급식 · 시간표</h3><p>오늘의 급식과 우리 반 시간표를 한눈에. 급식 별점도 남겨보세요.</p></div>
+        <div class="feature"><h3>핫이슈 · 등급</h3><p>지금 뜨는 글과 실시간 채팅, 활동으로 쌓는 등급 시스템.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">청주고등학교 학생들을 위한 커뮤니티 Square</footer>
+
+  <script type="module">
+    import { mountHeader, api, escapeHtml } from '/js/app.js';
+    const me = await mountHeader();
+    const actions = document.getElementById('hero-actions');
+    actions.innerHTML = me
+      ? `<a class="btn btn--primary" href="/community/free">커뮤니티 입장하기</a>`
+      : `<a class="btn btn--primary" href="/signup">회원가입</a>
+         <a class="btn btn--ghost" href="/login">이미 계정이 있나요? 로그인</a>`;
+
+    // 방문자 수 + D-day 메타 스트립
+    const meta = document.getElementById('home-meta');
+    try {
+      const [v, u, dd] = await Promise.all([
+        api('/api/stats/visitors'), api('/api/stats/users'), api('/api/dday'),
+      ]);
+      const ddays = dd.items.filter((d) => d.d_day >= 0).slice(0, 2)
+        .map((d) => `<span class="meta-chip">📅 ${escapeHtml(d.title)} D-${d.d_day}</span>`).join('');
+      meta.innerHTML = `
+        <span class="meta-chip">👥 회원 ${u.count}</span>
+        <span class="meta-chip">👀 오늘 ${v.today} · 누적 ${v.total}</span>
+        ${ddays}`;
+    } catch { /* 무시 */ }
+  </script>
+</body>
+</html>

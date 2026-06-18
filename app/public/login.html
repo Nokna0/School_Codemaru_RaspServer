@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 | 청주고등학교 커뮤니티 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <div class="card__body">
+        <div class="auth-head">
+          <img src="/icons/cheongju-emblem-480.webp" alt="청주고 엠블럼">
+          <h1>로그인</h1>
+          <p>청주고등학교 커뮤니티 Square</p>
+        </div>
+
+        <div class="form-msg" id="msg"></div>
+
+        <form id="login-form">
+          <div class="field">
+            <label for="username">아이디</label>
+            <input id="username" name="username" autocomplete="username" required>
+          </div>
+          <div class="field">
+            <label for="password">비밀번호</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+          </div>
+          <button class="btn btn--primary btn--block" type="submit" id="submit">로그인</button>
+        </form>
+
+        <div class="auth-foot">
+          계정이 없나요? <a href="/signup">회원가입</a> · <a href="/">홈으로</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, getMe } from '/js/app.js';
+    await mountHeader();
+
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next') || '/';
+    // 이미 로그인 상태면 바로 이동
+    if (await getMe()) location.href = next;
+
+    const form = document.getElementById('login-form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('submit');
+    const ERR = { invalid_credentials: '아이디 또는 비밀번호가 올바르지 않습니다.' };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'form-msg';
+      btn.disabled = true; btn.textContent = '로그인 중…';
+      try {
+        await api('/api/login', { method: 'POST', body: {
+          username: form.username.value.trim(),
+          password: form.password.value,
+        }});
+        location.href = next;
+      } catch (err) {
+        msg.textContent = ERR[err.message] || '로그인에 실패했습니다. 잠시 후 다시 시도해주세요.';
+        msg.className = 'form-msg error';
+        btn.disabled = false; btn.textContent = '로그인';
+      }
+    });
+  </script>
+</body>
+</html>

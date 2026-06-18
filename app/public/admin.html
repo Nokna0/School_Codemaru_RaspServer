@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container">
+    <div class="board-head"><h1 class="board-title">관리자 대시보드</h1></div>
+    <div id="guard"></div>
+
+    <div id="admin-body" class="hidden">
+      <!-- 통계 -->
+      <div class="admin-grid" id="stats"></div>
+
+      <!-- 보관함 -->
+      <div class="card" style="margin-bottom:16px"><div class="card__body">
+        <h2 class="card__title">🗄️ 보관함 (소프트 삭제된 글)</h2>
+        <div id="archive"><p class="muted">불러오는 중…</p></div>
+      </div></div>
+
+      <!-- 로그인 로그 -->
+      <div class="card" style="margin-bottom:16px"><div class="card__body">
+        <h2 class="card__title">🔐 로그인 로그 (최근)</h2>
+        <div id="logs"><p class="muted">불러오는 중…</p></div>
+      </div></div>
+
+      <!-- D-day 추가 -->
+      <div class="card"><div class="card__body">
+        <h2 class="card__title">📅 D-day 추가</h2>
+        <form id="dday-form" class="filter-block">
+          <input id="dday-title" placeholder="제목 (예: 수능)" required style="padding:8px 10px;border:1px solid var(--border);border-radius:8px">
+          <input id="dday-date" type="date" required style="padding:8px 10px;border:1px solid var(--border);border-radius:8px">
+          <button class="btn btn--primary" type="submit">추가</button>
+          <span id="dday-msg" class="muted"></span>
+        </form>
+      </div></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, getMe, timeAgo, escapeHtml } from '/js/app.js';
+    mountHeader();
+    const me = await getMe();
+    const guard = document.getElementById('guard');
+    if (!me) { guard.innerHTML = '<p class="empty-state">로그인이 필요합니다. <a href="/login">로그인</a></p>'; }
+    else if (me.role !== 'admin') { guard.innerHTML = '<p class="empty-state">관리자만 접근할 수 있습니다.</p>'; }
+    else { document.getElementById('admin-body').classList.remove('hidden'); init(); }
+
+    async function init() {
+      // 통계
+      try {
+        const [v, u] = await Promise.all([api('/api/stats/visitors'), api('/api/stats/users')]);
+        document.getElementById('stats').innerHTML = `
+          <div class="stat-card"><div class="num">${v.today}</div><div class="lbl">오늘 방문자</div></div>
+          <div class="stat-card"><div class="num">${v.total}</div><div class="lbl">누적 방문자</div></div>
+          <div class="stat-card"><div class="num">${u.count}</div><div class="lbl">총 회원수</div></div>`;
+      } catch { /* 무시 */ }
+
+      // 보관함
+      loadArchive();
+      async function loadArchive() {
+        try {
+          const { items } = await api('/api/admin/archive');
+          const box = document.getElementById('archive');
+          box.innerHTML = items.length ? `<table class="admin-table">
+            <tr><th>ID</th><th>제목</th><th>삭제시각</th><th></th></tr>
+            ${items.map((p) => `<tr><td>${p.id}</td><td>${escapeHtml(p.title)}</td>
+              <td>${timeAgo(p.deleted_at)}</td>
+              <td><button class="btn btn--ghost" data-restore="${p.id}">복원</button></td></tr>`).join('')}
+          </table>` : '<p class="muted">보관된 글이 없어요.</p>';
+          box.querySelectorAll('[data-restore]').forEach((b) => b.addEventListener('click', async () => {
+            await api('/api/admin/archive', { method: 'POST', body: { postId: Number(b.dataset.restore), action: 'restore' } });
+            loadArchive();
+          }));
+        } catch { document.getElementById('archive').innerHTML = '<p class="muted">불러오지 못했습니다.</p>'; }
+      }
+
+      // 로그인 로그
+      try {
+        const { items } = await api('/api/admin/login-logs');
+        document.getElementById('logs').innerHTML = items.length ? `<table class="admin-table">
+          <tr><th>시각</th><th>아이디</th><th>결과</th><th>IP</th></tr>
+          ${items.slice(0, 30).map((l) => `<tr><td>${timeAgo(l.created_at)}</td><td>${escapeHtml(l.username || '')}</td>
+            <td>${l.success ? '✅ 성공' : '❌ 실패'}</td><td>${escapeHtml(l.ip || '')}</td></tr>`).join('')}
+        </table>` : '<p class="muted">로그가 없어요.</p>';
+      } catch { /* 무시 */ }
+
+      // D-day 추가
+      const ddayForm = document.getElementById('dday-form');
+      ddayForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const dmsg = document.getElementById('dday-msg');
+        try {
+          await api('/api/admin/dday', { method: 'POST', body: {
+            title: document.getElementById('dday-title').value.trim(),
+            targetDate: document.getElementById('dday-date').value,
+          }});
+          dmsg.textContent = '추가됨'; ddayForm.reset();
+        } catch { dmsg.textContent = '실패'; }
+      });
+    }
+  </script>
+</body>
+</html>
