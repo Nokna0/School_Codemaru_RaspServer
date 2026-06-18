@@ -531,3 +531,102 @@ ROADMAP 완료 이후 "다음에 적용하면 좋을 것" 추천 순서대로 �
 | 9 | 마무리(rate limit·에러·학생인증 해시·audit·배포/백업) | ~110k |
 
 (누적 대략 ~1.1M 토큰 규모. 추정이며 실제와 차이가 있을 수 있음.)
+
+---
+
+## 2026-06-18 — git 함정: `commit -a`가 신규 파일 누락
+
+후속 개선 커밋 후 `animations.css`·`mypage.html`이 `??`(untracked)로 남아 있는 것을 발견.
+
+- **원인**: `git commit -a`(=`add -u`)는 *이미 추적 중인* 파일의 수정분만 스테이징한다. 한 번도
+  추적된 적 없는 신규 파일은 무시한다 → `.gitignore`와 무관(`git check-ignore` 빈 결과).
+- **위험**: 커밋된 `app.js`가 두 파일을 참조(애니 CSS 주입·`/mypage` 링크)하므로, 저장소에 파일이
+  없으면 새로 pull한 배포 환경에서 404/깨진 링크 발생. 즉 "내 PC에선 되는데 배포하면 깨지는" 전형.
+- **해결**: `git add <신규파일>` 후 커밋. (이후 사용자가 정리 커밋으로 반영·푸시.)
+- **재발 방지**: 신규 파일이 생긴 작업은 `git commit -a` 대신 **`git add -A` → `git commit`**.
+  커밋 전 `git status`로 `??` 항목 확인 습관화.
+
+---
+
+## ✅ 최종 점검 & 프로젝트 마무리 (2026-06-18)
+
+ROADMAP 0~9 + 전체 소스 리뷰 + 애니메이션 + 후속 개선(보안·마이페이지·압축)까지 완료. 최종 검증:
+
+- **문법**: `src/**/*.js` 전부 `node --check` 통과.
+- **부팅**: 에러/경고 없이 기동.
+- **페이지(200)**: `/`, `/login`, `/signup`, `/mypage`, `/messages`, `/community/free`,
+  `/community/free/meal`, `/admin`, `/styles/animations.css`, `/js/app.js`.
+- **API**: `/api/health` 200, 미인증 `/api/me` 401, `/api/posts` 200,
+  `/api/neis/meal` — NEIS 실급식 데이터 정상 응답(키 없이, 학교코드 8000066/M10).
+- **참조 무결성**: 커밋된 `app.js`가 가리키는 `animations.css`·`/mypage` 저장소에 실존.
+- **git**: 워킹트리 클린, `origin/feature/squarecj` 동기화 완료.
+
+### 배포 시 유의(요약)
+- 변경 반영하려면 **app·nginx 이미지 모두 재빌드**(ARM64 buildx) → Docker Hub → 파이 `compose pull && up -d`.
+- **추가 .env 변수 없음**. 로그인 잠금·프로필 변경은 코드/DB만으로 동작(스키마 변경 없음 — 기존 컬럼 사용).
+
+### 알려진 한계 / 향후 후보(당시 미적용 → 아래 라운드에서 전부 구현)
+- 보안 헤더(`@fastify/helmet`/CSP), 게시판 검색(SQLite FTS5), 업로드 이미지 리사이즈,
+  PWA(매니페스트+서비스워커), 헬스체크 기반 자동복구 — 다음 섹션에서 모두 적용함.
+
+**상태: 운영 배포 가능(production-ready).**
+
+---
+
+## 2026-06-18 — 강화 라운드 (보안·검색·이미지·PWA·운영)
+
+위 "향후 후보" 5건을 전부 구현 + 추가 안정화 2건. 새 의존성: `@fastify/helmet`, `sharp`.
+
+### #1 보안 헤더 (helmet/CSP)
+- `server.js`에 `@fastify/helmet` 등록. CSP를 **무빌드 구조에 맞춤**:
+  `script-src/style-src 'self' 'unsafe-inline'`(페이지마다 인라인 모듈·`style=` 속성 사용),
+  `img-src 'self' data: blob:`, `connect-src 'self'`(fetch+WS), `manifest-src/worker-src 'self'`,
+  `object-src 'none'`. `crossOriginEmbedderPolicy:false`(임베드 깨짐 방지).
+- **함정**: helmet 기본 CSP의 `script-src-attr 'none'`이 인라인 `onclick=` HTML 속성을 차단 →
+  목록 행(자유게시판/구인/베스트 3곳)이 클릭 불가가 됨. **CSP를 약화하는 대신** 인라인 핸들러를
+  제거: `onclick="location.href=…"` → `data-href="…"` + `app.js`에 전역 클릭 위임 1개. (보안 유지)
+- 검증: `/login` 응답에 CSP·HSTS·X-Frame-Options·nosniff 헤더 확인.
+
+### #2 게시판 검색 (FTS5 trigram + LIKE 폴백)
+- `schema.sql`: `posts_fts`(external-content, `content='posts'`, `tokenize='trigram'`) + insert/delete/update
+  트리거로 동기화. `db/index.js`: 기존 글 있는데 FTS 비면 1회 `rebuild`(마이그레이션).
+- 한글 토큰 경계 문제 → **trigram**(부분문자열) 채택. 단 trigram은 3글자↑만 색인 →
+  **2글자 이하는 LIKE 폴백** 하이브리드(`posts.js` `/posts/search`). MATCH 질의는 큰따옴표로 감싸 안전화.
+- 프론트: `free.html`에 검색창(`?q=`), 결과/빈상태/페이저(q 보존). `board.css` 검색창 스타일.
+- 검증: '수학시'(trigram) 1건, '급식'(LIKE) 1건, 'zzzz' 0건.
+
+### #3 업로드 이미지 리사이즈 (sharp)
+- `upload.js`: 스트림 저장 → `toBuffer` 후 sharp로 **긴 변 1600px 제한 + EXIF 회전 반영 + 메타 제거 +
+  재인코딩**(jpeg/webp 품질82, png 압축9). gif는 애니 보존 위해 원본 유지.
+- 파이 안전장치: `sharp.concurrency(1)`, 그리고 **sharp 로드 실패 시 원본 저장으로 graceful degrade**
+  (네이티브 모듈이 ARM 빌드에서 깨져도 업로드 자체는 계속 동작).
+- 검증: 3000×2000 PNG 업로드 → 1600×1067 저장, 용량 23KB→6.7KB.
+
+### #4 PWA
+- `manifest.webmanifest` **아이콘 경로 버그 수정**(`/icon-192.png` → `/icons/icon-192.png`) + maskable/scope/lang.
+- `sw.js` 신규: **network-first**(자산 버전해시 없음 → staleness 방지), `/icons`·`/fonts`만 cache-first,
+  `/api`·`/ws`·비-GET·교차출처 우회, 오프라인 내비게이션은 홈 폴백. 버전(`square-v1`) 올리면 옛 캐시 정리.
+- `app.js`: manifest/apple-touch 링크 + SW 등록을 **전 페이지에 자동 주입**(index 외에도).
+
+### #5 헬스체크 자동복구 (운영, 추가)
+- `docker-compose.yml` app `healthcheck`: slim 이미지엔 curl/wget 없어 **node 내장 fetch**로 `/api/health` 확인.
+- plain compose는 unhealthy 자동복구 미지원 → **autoheal 컨테이너**(label `autoheal=true` 감시) 추가.
+  nginx는 `depends_on: condition: service_healthy`로 app 정상 후 기동.
+
+### 추가 안정화
+- **graceful shutdown**(`server.js`): SIGTERM/SIGINT → `app.close()` + `wal_checkpoint(TRUNCATE)` + `db.close()`.
+  Docker stop 시 연결 정리 + WAL 안전 반영(다음 부팅 빠름). 검증: 종료 시 "정상 종료 완료" 로그.
+
+### 재배포 메모
+- **app·nginx 이미지 모두 재빌드**(ARM64). app는 새 네이티브 의존성 `sharp` 포함 — buildx가 ARM64
+  컨테이너 안에서 `npm install` 시 arm64 prebuilt를 받음(node:20-bookworm-slim). nginx 변경은 없으나
+  compose 변경(healthcheck/autoheal)은 파이의 compose 파일 갱신 필요.
+- 신규 컨테이너 `autoheal`은 `/var/run/docker.sock` 마운트 필요(자체호스팅이라 허용).
+- **스키마 변경**: `posts_fts` + 트리거 추가(모두 `IF NOT EXISTS`/트리거 가드, 기존 DB 자동 마이그레이션).
+- **.env 추가 변수 없음**.
+
+### 검증 요약
+Node E2E 스크립트로 일괄 확인(임시 DB/업로드 격리): 부팅·가입·작성·검색3종·업로드 리사이즈·CSP·PWA 자산·
+graceful shutdown 전부 ✅. 실 DB 무변경(users:0/posts:0).
+
+**상태: 운영 배포 가능(production-ready). 본 DEVLOG 완결.**

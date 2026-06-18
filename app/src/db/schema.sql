@@ -203,3 +203,21 @@ CREATE TABLE IF NOT EXISTS admin_login_logs (
   success    INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ===== 게시판 전문검색(FTS5) =====
+-- 한글은 토큰 경계가 모호해 trigram 토크나이저로 부분문자열 검색 지원(3글자↑).
+-- external-content(content='posts')로 본문 중복저장 없이 posts.id를 rowid로 사용.
+CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+  title, content, content='posts', content_rowid='id', tokenize='trigram'
+);
+-- posts 변경을 FTS에 동기화하는 트리거(insert/delete/update).
+CREATE TRIGGER IF NOT EXISTS posts_fts_ai AFTER INSERT ON posts BEGIN
+  INSERT INTO posts_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+END;
+CREATE TRIGGER IF NOT EXISTS posts_fts_ad AFTER DELETE ON posts BEGIN
+  INSERT INTO posts_fts(posts_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+END;
+CREATE TRIGGER IF NOT EXISTS posts_fts_au AFTER UPDATE ON posts BEGIN
+  INSERT INTO posts_fts(posts_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+  INSERT INTO posts_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+END;

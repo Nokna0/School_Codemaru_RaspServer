@@ -31,7 +31,7 @@
 
     const listEl = document.getElementById('best-list');
     function row(p, i) {
-      return `<li class="post-row" onclick="location.href='/community/free/view?id=${p.id}'">
+      return `<li class="post-row" data-href="/community/free/view?id=${p.id}">
         <div class="post-row__main">
           <span class="best-rank">${i + 1}</span>
           <span class="post-row__title">${escapeHtml(p.title)}</span>

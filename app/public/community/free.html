@@ -16,7 +16,13 @@
     <main>
       <div class="board-head">
         <h1 class="board-title">자유게시판</h1>
-        <a class="btn btn--primary" href="/community/free/new">글쓰기</a>
+        <div class="board-head__actions">
+          <form id="search-form" class="search-form" role="search">
+            <input id="search-input" type="search" name="q" placeholder="제목·내용 검색" maxlength="50" autocomplete="off">
+            <button class="btn btn--ghost" type="submit">검색</button>
+          </form>
+          <a class="btn btn--primary" href="/community/free/new">글쓰기</a>
+        </div>
       </div>
       <div class="card">
         <ul class="post-list" id="post-list">
@@ -37,10 +43,21 @@
 
     const params = new URLSearchParams(location.search);
     const page = Math.max(Number(params.get('page')) || 1, 1);
+    const q = (params.get('q') || '').trim();
     const listEl = document.getElementById('post-list');
 
+    // 검색창: 현재 질의 표시 + 제출 시 ?q= 로 이동(빈 값이면 목록으로).
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-input');
+    searchInput.value = q;
+    searchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = searchInput.value.trim();
+      location.href = v ? `/community/free?q=${encodeURIComponent(v)}` : '/community/free';
+    });
+
     function row(p) {
-      return `<li class="post-row" onclick="location.href='/community/free/view?id=${p.id}'">
+      return `<li class="post-row" data-href="/community/free/view?id=${p.id}">
         <div class="post-row__main">
           <span class="post-row__title">${escapeHtml(p.title)}</span>
           ${p.comment_count ? `<span class="post-row__cc">[${p.comment_count}]</span>` : ''}
@@ -55,16 +72,23 @@
     }
 
     try {
-      const { items, total, size } = await api(`/api/posts?board=free&page=${page}`);
+      const url = q
+        ? `/api/posts/search?board=free&q=${encodeURIComponent(q)}&page=${page}`
+        : `/api/posts?board=free&page=${page}`;
+      const { items, total, size } = await api(url);
+      const emptyMsg = q
+        ? `'${escapeHtml(q)}' 검색 결과가 없어요.`
+        : '아직 글이 없어요. 첫 글을 남겨보세요!';
       listEl.innerHTML = items.length
         ? items.map(row).join('')
-        : '<li class="post-empty">아직 글이 없어요. 첫 글을 남겨보세요!</li>';
+        : `<li class="post-empty">${emptyMsg}</li>`;
       const pages = Math.max(Math.ceil(total / size), 1);
       if (pages > 1) {
         const pager = document.getElementById('pager');
+        const qs = q ? `q=${encodeURIComponent(q)}&` : '';
         let h = '';
         for (let i = 1; i <= pages; i++) {
-          h += `<a class="page-link${i === page ? ' active' : ''}" href="?page=${i}">${i}</a>`;
+          h += `<a class="page-link${i === page ? ' active' : ''}" href="?${qs}page=${i}">${i}</a>`;
         }
         pager.innerHTML = h;
       }

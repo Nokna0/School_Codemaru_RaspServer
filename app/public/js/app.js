@@ -19,6 +19,32 @@ if (typeof document !== 'undefined' && !document.querySelector('link[data-anim]'
 }
 const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+// PWA: manifest/아이콘 링크가 없으면 주입 + 서비스워커 등록(전 페이지 공통, index 외에도 적용).
+if (typeof document !== 'undefined') {
+  const head = document.head;
+  if (!head.querySelector('link[rel="manifest"]')) {
+    const m = document.createElement('link');
+    m.rel = 'manifest'; m.href = '/manifest.webmanifest';
+    head.appendChild(m);
+  }
+  if (!head.querySelector('link[rel="apple-touch-icon"]')) {
+    const a = document.createElement('link');
+    a.rel = 'apple-touch-icon'; a.href = '/icons/apple-touch-icon.png';
+    head.appendChild(a);
+  }
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+
+  // 전역 클릭 위임: [data-href] 요소 클릭 시 이동. (인라인 onclick 제거 — CSP script-src-attr 'none' 호환)
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-href]');
+    if (el) location.href = el.getAttribute('data-href');
+  });
+}
+
 // ---- API ----
 export async function api(path, { method = 'GET', body, headers } = {}) {
   const opts = { method, credentials: 'same-origin', headers: { ...headers } };

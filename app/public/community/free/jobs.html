@@ -75,7 +75,7 @@
 
     const listEl = document.getElementById('job-list');
     function row(j) {
-      return `<li class="post-row" onclick="location.href='/community/free/jobs/view?id=${j.id}'">
+      return `<li class="post-row" data-href="/community/free/jobs/view?id=${j.id}">
         <div class="post-row__main">
           ${j.status === 'closed' ? '<span class="badge-closed">마감</span>' : '<span class="badge-open">모집중</span>'}
           <span class="post-row__title">${escapeHtml(j.title)}</span>

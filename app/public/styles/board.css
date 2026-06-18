@@ -1,6 +1,15 @@
 /* 게시판(목록/상세/작성) 스타일 */
-.board-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .board-title { font-size: 22px; font-weight: 800; margin: 0; }
+.board-head__actions { display: flex; align-items: center; gap: 8px; }
+.search-form { display: flex; align-items: center; gap: 6px; }
+.search-form input { padding: 7px 11px; border: 1px solid var(--line, #dfe3e8); border-radius: 8px; font-size: 14px; min-width: 160px; }
+.search-form input:focus { outline: none; border-color: var(--brand, #0F5FB7); }
+@media (max-width: 560px) {
+  .board-head__actions { width: 100%; }
+  .search-form { flex: 1; }
+  .search-form input { min-width: 0; flex: 1; }
+}
 
 /* 목록 */
 .post-list { list-style: none; margin: 0; padding: 0; }

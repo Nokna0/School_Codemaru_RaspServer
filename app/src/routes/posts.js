@@ -34,6 +34,47 @@ export default async function postsRoutes(app) {
     return { items: rows, page: Number(page), size: limit, total };
   });
 
+  // 검색. GET /api/posts/search?q=...&board=free&page=1
+  // 3글자↑는 FTS5 trigram(부분일치·빠름), 1~2글자는 LIKE 폴백(짧은 질의는 trigram 무력).
+  app.get('/posts/search', async (req) => {
+    const { q = '', board = 'free', page = '1', size = '20' } = req.query;
+    const query = String(q).trim();
+    if (!query) return { items: [], page: 1, size: 0, total: 0, q: '' };
+    const limit = Math.min(Number(size) || 20, 50);
+    const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
+
+    const cols = `p.id, p.board, p.title, p.is_anonymous, p.view_count, p.like_count,
+                  p.comment_count, p.created_at, ${AUTHOR_NAME.replace(/%s/g, 'p')} AS author_name`;
+    let items; let total;
+
+    // [...query] 로 코드포인트 길이 측정(서로게이트 안전). 3↑면 FTS, 아니면 LIKE.
+    if ([...query].length >= 3) {
+      // trigram MATCH: 큰따옴표로 감싸 구문(특수문자) 안전화, 내부 " 는 이스케이프.
+      const match = `"${query.replace(/"/g, '""')}"`;
+      const where = `WHERE f.posts_fts MATCH ? AND p.board=? AND p.deleted_at IS NULL`;
+      items = db.prepare(
+        `SELECT ${cols} FROM posts_fts f JOIN posts p ON p.id = f.rowid
+         LEFT JOIN users u ON u.id = p.author_id
+         ${where} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      ).all(match, board, limit, offset);
+      total = db.prepare(
+        `SELECT count(*) c FROM posts_fts f JOIN posts p ON p.id = f.rowid ${where}`,
+      ).get(match, board).c;
+    } else {
+      const like = `%${query.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+      const where = `WHERE p.board=? AND p.deleted_at IS NULL
+                       AND (p.title LIKE ? ESCAPE '\\' OR p.content LIKE ? ESCAPE '\\')`;
+      items = db.prepare(
+        `SELECT ${cols} FROM posts p LEFT JOIN users u ON u.id = p.author_id
+         ${where} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      ).all(board, like, like, limit, offset);
+      total = db.prepare(
+        `SELECT count(*) c FROM posts p ${where}`,
+      ).get(board, like, like).c;
+    }
+    return { items, page: Number(page), size: limit, total, q: query };
+  });
+
   // 베스트/핫이슈. GET /api/posts/best — 핫스코어 실시간 산정.
   app.get('/posts/best', async () => {
     const rows = db.prepare(
