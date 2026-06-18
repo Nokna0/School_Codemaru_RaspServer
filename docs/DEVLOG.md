@@ -474,6 +474,44 @@ Dockerfile 결함 아님 — **동일 Dockerfile의 x86 빌드는 0단계에서 
 
 ---
 
+## 2026-06-18 — 후속 개선 (보안 묶음 + 학년/반 변경 + nginx 압축)
+
+ROADMAP 완료 이후 "다음에 적용하면 좋을 것" 추천 순서대로 진행. 4건.
+
+### #1 CSRF (이미 충족 + 보완)
+- 세션 쿠키 `sq_session`은 이미 `httpOnly` + `sameSite='lax'`. 상태변경 API는 전부 POST/PUT/DELETE라
+  크로스사이트 요청에 쿠키가 안 실려 CSRF가 구조적으로 차단됨 → 추가 토큰 불필요.
+- 보완: `clearSession`의 `clearCookie`에도 `httpOnly/sameSite/secure` 속성을 맞춰 일부 브라우저의
+  로그아웃 쿠키 미삭제 방지(`lib/auth.js`).
+
+### #3 로그인 무차별 대입 방어 (계정별 잠금)
+- 기존 IP 기반 제한(`auth:` 10회/분)만으로는 IP 로테이션·CGNAT 공유에 취약 → **username 단위 잠금** 추가.
+- `lib/ratelimit.js`: `isLockedOut/recordFail/clearFails`(인메모리, 실패 시각 슬라이딩 윈도우 + 주기 정리).
+- `routes/auth.js` 로그인: 10분 내 실패 7회면 `429 too_many_attempts`, 성공 시 카운터 리셋.
+- `login.html`: `too_many_attempts`/`too_many_requests` 한글 안내 메시지.
+- 검증: 오답 7회까지 401 → 8회차부터(정답 포함) 429. ✅
+
+### #8 학년/반·닉네임 변경 (코드 내 TODO 해소)
+- 가입 시 학년/반은 저장되나 *변경* 수단이 없어 진급/반편성 후 못 바꿈(meal.html에 "추후 추가" 주석).
+- 백엔드 `PUT /api/me/profile {nickname,grade,classNo}`(zod 검증, `routes/me.js`).
+- 프론트 신규 `public/mypage.html`(프로필 폼 + 계정 정보), 헤더 user-chip를 `/mypage` 링크로 변경,
+  meal.html 안내를 "내 정보에서 변경" 으로 갱신.
+- 검증(E2E): 가입→`/api/me` 1-1 확인→PUT(2학년5반/닉변경)→`/api/me` 반영 확인, grade=9는 400. ✅
+  (테스트 유저 tester1 및 종속 행 정리 → users:0 복귀)
+
+### #4 nginx 압축 + 정적 캐시
+- `gzip on`(comp 5, text/css/js/json/svg/woff2) — 전송량·파이 대역폭 절감.
+- `/icons/`·`/uploads/`는 `expires 30d` + `Cache-Control public`. (JS/CSS는 무버전이라 장기 캐시 대신
+  @fastify/static의 ETag/Last-Modified 304 재검증에 의존 — 스테일 위험 회피.)
+- brotli는 기본 nginx 이미지에 모듈 없어 제외(추가 시 빌드 실패).
+
+### 재배포 메모
+- **app 이미지 재빌드** 필요: 프론트(mypage.html 등) + auth/me/ratelimit 변경.
+- **nginx 이미지 재빌드** 필요: gzip/캐시 추가.
+- 파이: `docker compose pull && up -d`. .env 추가 변수는 없음.
+
+---
+
 ## 📊 단계별 토큰 사용량 (추정치)
 
 > ⚠️ 정확한 토큰 텔레메트리는 에이전트가 직접 측정할 수 없어 **작업량 기반 대략 추정치**다(입력+출력 합산,

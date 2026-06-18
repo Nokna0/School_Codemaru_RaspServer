@@ -262,11 +262,11 @@ export async function mountHeader() {
         <button class="icon-btn" id="notif-bell" title="알림">🔔<span class="notif-badge hidden" id="notif-badge">0</span></button>
         <div class="notif-dropdown hidden" id="notif-dropdown"></div>
       </div>
-      <span class="user-chip" title="경험치 ${me.into_level ?? 0}/${span} (총 ${me.exp ?? 0})">
+      <a class="user-chip" href="/mypage" title="경험치 ${me.into_level ?? 0}/${span} (총 ${me.exp ?? 0}) · 내 정보">
         ${escapeHtml(me.nickname || me.username)}
         <small>Lv.${me.level ?? 1}</small>
         <span class="exp-bar"><span class="exp-bar__fill" style="width:${pct}%"></span></span>
-      </span>
+      </a>
       <button class="btn btn--ghost" id="btn-logout">로그아웃</button>`;
     document.getElementById('btn-logout').addEventListener('click', () => logout());
     mountNotifications();

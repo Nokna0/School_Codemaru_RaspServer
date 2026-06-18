@@ -7,6 +7,11 @@ import {
 } from '../lib/auth.js';
 import { levelInfo } from '../lib/level.js';
 import { hashCode } from '../lib/codes.js';
+import { isLockedOut, recordFail, clearFails } from '../lib/ratelimit.js';
+
+// 계정별 로그인 잠금: 10분 내 실패 7회면 잠금(서버 재시작 시 초기화).
+const LOGIN_MAX_FAIL = 7;
+const LOGIN_WINDOW_MS = 10 * 60_000;
 
 const signupSchema = z.object({
   username: z.string().min(2).max(20),
@@ -52,12 +57,21 @@ export default async function authRoutes(app) {
     const { username, password } = z.object({
       username: z.string(), password: z.string(),
     }).parse(req.body);
+    // 계정별 무차별 대입 방어: 실패 누적 시 잠금(IP 제한과 별개).
+    const lockKey = `login:${username}`;
+    if (isLockedOut(lockKey, LOGIN_MAX_FAIL, LOGIN_WINDOW_MS)) {
+      return reply.code(429).send({ error: 'too_many_attempts' });
+    }
     const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
     const ok = user && await verifyPassword(password, user.password_hash);
     // 로그인 감사 로그(성공/실패). 운영자 모니터링용.
     db.prepare('INSERT INTO admin_login_logs (user_id, username, ip, ua, success) VALUES (?,?,?,?,?)')
       .run(user?.id ?? null, username, req.ip, req.headers['user-agent'] ?? null, ok ? 1 : 0);
-    if (!ok) return reply.code(401).send({ error: 'invalid_credentials' });
+    if (!ok) {
+      recordFail(lockKey, LOGIN_WINDOW_MS);
+      return reply.code(401).send({ error: 'invalid_credentials' });
+    }
+    clearFails(lockKey);
     db.prepare('UPDATE users SET last_seen_at=datetime(\'now\') WHERE id=?').run(user.id);
     setSession(reply, user);
     return { id: user.id, username: user.username, role: user.role };

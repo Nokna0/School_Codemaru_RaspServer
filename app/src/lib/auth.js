@@ -29,7 +29,10 @@ export function setSession(reply, user) {
   });
 }
 export function clearSession(reply) {
-  reply.clearCookie(COOKIE, { path: '/' });
+  reply.clearCookie(COOKIE, {
+    path: '/', httpOnly: true, sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
 }
 
 export function readUser(req) {
