@@ -1,0 +1,106 @@
+/* Square 애니메이션 레이어 (app.js가 전 페이지에 자동 주입).
+   모든 모션은 prefers-reduced-motion: no-preference 안에서만 — 접근성 존중. */
+
+/* ===== 스켈레톤 로딩 (모션 무관, 항상) ===== */
+.skeleton { position: relative; overflow: hidden; background: #e9eef4; border-radius: 6px; }
+.skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+  transform: translateX(-100%);
+}
+.sk-line { height: 12px; margin: 8px 0; }
+.sk-row { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.sk-row .skeleton { height: 14px; }
+.sk-row .skeleton.short { width: 40%; margin-top: 8px; height: 10px; }
+
+/* ===== 토스트 (모션 무관 기본 위치) ===== */
+.toast-wrap { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast { background: #1a2233; color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.toast.ok { background: var(--brand); }
+.toast.err { background: var(--danger); }
+
+/* ===== 좋아요 하트 버스트 / 레벨업 폭죽 (생성 요소) ===== */
+.burst-heart { position: fixed; z-index: 300; font-size: 18px; pointer-events: none; will-change: transform, opacity; }
+.confetti-piece { position: fixed; z-index: 300; width: 9px; height: 14px; pointer-events: none; will-change: transform, opacity; border-radius: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 페이지 진입 */
+  body { animation: pageIn .4s ease both; }
+  @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* 카드/요소 진입 (삽입 시 자동 실행) */
+  .card, .feature, .stat-card, .meal-card { animation: fadeUp .45s ease both; }
+  .feature:nth-child(2) { animation-delay: .07s; }
+  .feature:nth-child(3) { animation-delay: .14s; }
+  .meal-grid .meal-card:nth-child(2) { animation-delay: .07s; }
+  .meal-grid .meal-card:nth-child(3) { animation-delay: .14s; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  /* 목록 행 스태거 진입 */
+  .post-row { animation: fadeUp .4s ease both; }
+  .post-row:nth-child(1){animation-delay:.02s} .post-row:nth-child(2){animation-delay:.05s}
+  .post-row:nth-child(3){animation-delay:.08s} .post-row:nth-child(4){animation-delay:.11s}
+  .post-row:nth-child(5){animation-delay:.14s} .post-row:nth-child(6){animation-delay:.17s}
+  .post-row:nth-child(7){animation-delay:.20s} .post-row:nth-child(8){animation-delay:.23s}
+
+  /* 히어로 */
+  .hero h1 { animation: heroUp .6s ease both; }
+  .hero p { animation: heroUp .6s .12s ease both; }
+  .hero-actions { animation: heroUp .6s .24s ease both; }
+  .home-meta { animation: heroUp .6s .32s ease both; }
+  .feature-grid { animation: heroUp .6s .4s ease both; }
+  @keyframes heroUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+  /* 호버 리프트 */
+  .feature, .stat-card { transition: transform .16s ease, box-shadow .16s ease; }
+  .feature:hover, .stat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(16,32,64,.12); }
+  .post-row { transition: background .12s ease, padding-left .12s ease; }
+  .post-row:hover { padding-left: 22px; }
+  .btn { transition: background .15s, border-color .15s, transform .08s ease; }
+  .btn:active { transform: scale(.96); }
+
+  /* 네비 밑줄 */
+  .nav a { position: relative; }
+  .nav a::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; background: var(--brand); transform: scaleX(0); transform-origin: left; transition: transform .2s ease; border-radius: 2px; }
+  .nav a:hover::after, .nav a.active::after { transform: scaleX(1); }
+
+  /* 알림 드롭다운 팝인 */
+  .notif-dropdown:not(.hidden) { animation: popIn .16s ease both; transform-origin: top right; }
+  @keyframes popIn { from { opacity: 0; transform: scale(.94) translateY(-4px); } to { opacity: 1; transform: none; } }
+
+  /* 알림 배지 펄스 */
+  .notif-badge.pulse { animation: badgePulse .5s ease; }
+  @keyframes badgePulse { 0%,100%{transform:scale(1)} 30%{transform:scale(1.5)} 60%{transform:scale(.9)} }
+
+  /* 새 채팅 메시지 슬라이드인 */
+  .chat-msg.new { animation: chatIn .28s ease both; }
+  @keyframes chatIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+  /* 별점 바운스 + 호버 */
+  .stars[data-readonly="0"] .star { transition: transform .12s ease; }
+  .stars[data-readonly="0"] .star:hover { transform: scale(1.25); }
+  .star.bounce { animation: starPop .32s ease; }
+  @keyframes starPop { 0%{transform:scale(1)} 40%{transform:scale(1.45)} 70%{transform:scale(.85)} 100%{transform:scale(1)} }
+
+  /* 좋아요 버튼 펄스 */
+  .like-btn.pop { animation: likePop .35s ease; }
+  @keyframes likePop { 0%{transform:scale(1)} 35%{transform:scale(1.18)} 100%{transform:scale(1)} }
+
+  /* 스켈레톤 시머 */
+  .skeleton::after { animation: shimmer 1.25s infinite; }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+  /* 토스트 등장/퇴장 */
+  .toast { animation: toastIn .25s ease both; }
+  .toast.out { animation: toastOut .25s ease both; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(8px); } }
+
+  /* 하트 버스트 */
+  @keyframes heartFly { to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.4); } }
+  /* 폭죽 */
+  @keyframes confettiFall { to { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); } }
+
+  /* exp 바 채워짐 */
+  .exp-bar__fill { transition: width .6s cubic-bezier(.2,.8,.2,1); }
+}

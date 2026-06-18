@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 정보 | 청고 Square</title>
+  <meta name="theme-color" content="#0F5FB7">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles/app.css">
+  <link rel="stylesheet" href="/styles/board.css">
+</head>
+<body>
+  <div id="app-header"></div>
+
+  <div class="container" style="max-width:640px">
+    <div class="board-head"><h1 class="board-title">내 정보</h1></div>
+
+    <div class="card"><div class="card__body">
+      <h2 class="card__title">프로필 수정</h2>
+      <div class="form-msg" id="msg"></div>
+      <form id="profile-form">
+        <div class="field">
+          <label for="nickname">닉네임</label>
+          <input id="nickname" maxlength="20" required>
+        </div>
+        <div class="field-row">
+          <div class="field" style="flex:1">
+            <label for="grade">학년</label>
+            <select id="grade"></select>
+          </div>
+          <div class="field" style="flex:1">
+            <label for="classNo">반</label>
+            <select id="classNo"></select>
+          </div>
+        </div>
+        <p class="muted" style="font-size:13px">진급하거나 반이 바뀌면 여기서 바꾸면 급식·시간표 기본값에 반영돼요.</p>
+        <div style="text-align:right"><button class="btn btn--primary" type="submit" id="save-btn">저장</button></div>
+      </form>
+    </div></div>
+
+    <div class="card" style="margin-top:16px"><div class="card__body">
+      <h2 class="card__title">계정</h2>
+      <p class="muted" id="account-info">불러오는 중…</p>
+    </div></div>
+  </div>
+
+  <script type="module">
+    import { api, mountHeader, requireLogin, toast } from '/js/app.js';
+    mountHeader();
+    const me = await requireLogin();
+
+    const gradeSel = document.getElementById('grade');
+    const classSel = document.getElementById('classNo');
+    for (let g = 1; g <= 3; g++) gradeSel.add(new Option(`${g}학년`, g));
+    for (let c = 1; c <= 11; c++) classSel.add(new Option(`${c}반`, c));
+
+    document.getElementById('nickname').value = me.nickname || me.username;
+    gradeSel.value = me.grade || 1;
+    classSel.value = me.class_no || 1;
+    document.getElementById('account-info').textContent =
+      `아이디 ${me.username} · Lv.${me.level ?? 1} · 경험치 ${me.exp ?? 0}`;
+
+    const form = document.getElementById('profile-form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('save-btn');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'form-msg'; btn.disabled = true;
+      try {
+        await api('/api/me/profile', { method: 'PUT', body: {
+          nickname: document.getElementById('nickname').value.trim(),
+          grade: Number(gradeSel.value),
+          classNo: Number(classSel.value),
+        }});
+        msg.textContent = '저장했어요.'; msg.className = 'form-msg ok';
+        toast('내 정보를 저장했어요 ✅', 'ok');
+      } catch {
+        msg.textContent = '저장에 실패했습니다.'; msg.className = 'form-msg error';
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>
